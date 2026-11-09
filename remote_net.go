@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hirochachacha/go-smb2"
@@ -30,6 +31,7 @@ const dialTimeout = 20 * time.Second
 
 type sftpRaw struct {
 	conf remoteConf
+	mu   sync.Mutex // csak a mezőkhöz; maguk a műveletek párhuzamosan futhatnak
 	ssh  *ssh.Client
 	c    *sftp.Client
 }
@@ -197,8 +199,37 @@ func (r *sftpRaw) connect() error {
 		cl.Close()
 		return fmt.Errorf(T("a szerveren nem érhető el az SFTP: %v"), err)
 	}
+	r.mu.Lock()
 	r.ssh, r.c = cl, c
+	r.mu.Unlock()
+	go sshKeepalive(cl)
 	return nil
+}
+
+// sshKeepalive félpercenként jelez a szervernek. Ha a kapcsolat csendben elhalt
+// (alvó gép, Wi-Fi-váltás, tűzfal), a választ nem kapja meg, és bontja a kapcsolatot:
+// így a rajta várakozó műveletek hibával visszatérnek, ahelyett hogy örökké várnának.
+func sshKeepalive(cl *ssh.Client) {
+	t := time.NewTicker(30 * time.Second)
+	defer t.Stop()
+	for range t.C {
+		res := make(chan error, 1)
+		go func() {
+			_, _, err := cl.SendRequest("keepalive@openssh.com", true, nil)
+			res <- err
+		}()
+		select {
+		case err := <-res:
+			if err != nil {
+				cl.Close()
+				return
+			}
+		case <-time.After(45 * time.Second):
+			dlog("SFTP: a szerver nem válaszol, a kapcsolat bontva")
+			cl.Close()
+			return
+		}
+	}
 }
 
 func sshErr(err error) error {
@@ -210,13 +241,15 @@ func sshErr(err error) error {
 }
 
 func (r *sftpRaw) close() {
-	if r.c != nil {
-		r.c.Close()
-		r.c = nil
+	r.mu.Lock()
+	c, cl := r.c, r.ssh
+	r.c, r.ssh = nil, nil
+	r.mu.Unlock()
+	if c != nil {
+		c.Close()
 	}
-	if r.ssh != nil {
-		r.ssh.Close()
-		r.ssh = nil
+	if cl != nil {
+		cl.Close()
 	}
 }
 
@@ -226,10 +259,19 @@ func (r *sftpRaw) reconnect() error {
 }
 
 func (r *sftpRaw) client() (*sftp.Client, error) {
+	r.mu.Lock()
+	c := r.c
+	r.mu.Unlock()
+	if c != nil {
+		return c, nil
+	}
+	if err := r.connect(); err != nil {
+		return nil, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.c == nil {
-		if err := r.connect(); err != nil {
-			return nil, err
-		}
+		return nil, errors.New(T("a kapcsolat megszakadt"))
 	}
 	return r.c, nil
 }
@@ -401,6 +443,7 @@ func (r *davRaw) close()                                       {}
 
 type smbRaw struct {
 	conf   remoteConf
+	mu     sync.Mutex // a kapcsolat mezőihez és a megosztáslistához
 	conn   net.Conn
 	s      *smb2.Session
 	shares map[string]*smb2.Share
@@ -447,22 +490,44 @@ func (r *smbRaw) connect() error {
 		}
 		return err
 	}
+	r.mu.Lock()
 	r.conn, r.s, r.shares = conn, s, map[string]*smb2.Share{}
+	r.mu.Unlock()
 	return nil
 }
 
+// session az élő munkamenet; ha nincs, csatlakozik.
+func (r *smbRaw) session() (*smb2.Session, error) {
+	r.mu.Lock()
+	s := r.s
+	r.mu.Unlock()
+	if s != nil {
+		return s, nil
+	}
+	if err := r.connect(); err != nil {
+		return nil, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.s == nil {
+		return nil, errors.New(T("a kapcsolat megszakadt"))
+	}
+	return r.s, nil
+}
+
 func (r *smbRaw) close() {
-	for _, sh := range r.shares {
+	r.mu.Lock()
+	shares, s, conn := r.shares, r.s, r.conn
+	r.shares, r.s, r.conn = nil, nil, nil
+	r.mu.Unlock()
+	for _, sh := range shares {
 		sh.Umount()
 	}
-	r.shares = nil
-	if r.s != nil {
-		r.s.Logoff()
-		r.s = nil
+	if s != nil {
+		s.Logoff()
 	}
-	if r.conn != nil {
-		r.conn.Close()
-		r.conn = nil
+	if conn != nil {
+		conn.Close()
 	}
 }
 
@@ -478,31 +543,41 @@ func (r *smbRaw) split(p string) (*smb2.Share, string, error) {
 	if share == "" {
 		return nil, "", errors.New(T("ez a megosztások listája: itt nem lehet fájlművelet"))
 	}
-	if r.s == nil {
-		if err := r.connect(); err != nil {
-			return nil, "", err
-		}
+	s, err := r.session()
+	if err != nil {
+		return nil, "", err
 	}
-	sh, ok := r.shares[strings.ToLower(share)]
+	key := strings.ToLower(share)
+	r.mu.Lock()
+	sh, ok := r.shares[key]
+	r.mu.Unlock()
 	if !ok {
-		var err error
-		sh, err = r.s.Mount(`\\` + r.conf.Host + `\` + share)
+		sh, err = s.Mount(`\\` + r.conf.Host + `\` + share)
 		if err != nil {
 			return nil, "", fmt.Errorf(T("a(z) „%s” megosztás nem nyitható meg: %v"), share, err)
 		}
-		r.shares[strings.ToLower(share)] = sh
+		r.mu.Lock()
+		if old, dup := r.shares[key]; dup { // közben egy másik művelet is csatolta
+			r.mu.Unlock()
+			sh.Umount()
+			sh = old
+		} else {
+			if r.shares != nil {
+				r.shares[key] = sh
+			}
+			r.mu.Unlock()
+		}
 	}
 	return sh, strings.ReplaceAll(rest, "/", `\`), nil
 }
 
 func (r *smbRaw) list(dir string) ([]rawInfo, error) {
 	if path.Clean("/"+dir) == "/" {
-		if r.s == nil {
-			if err := r.connect(); err != nil {
-				return nil, err
-			}
+		s, err := r.session()
+		if err != nil {
+			return nil, err
 		}
-		names, err := r.s.ListSharenames()
+		names, err := s.ListSharenames()
 		if err != nil {
 			return nil, err
 		}

@@ -200,33 +200,44 @@ func savePlacement(a *App, h win.HWND, key string) {
 
 // restorePlacement true, ha volt mentett, látható helyre eső méret.
 func restorePlacement(a *App, h win.HWND, key string) bool {
+	ok, _ := placeWindow(a, h, key, false)
+	return ok
+}
+
+// placeWindow visszaállítja a mentett helyet. hidden esetén az ablak rejtve marad
+// (csak a helye és a mérete áll be); a második érték, hogy teljes méretű volt-e.
+func placeWindow(a *App, h win.HWND, key string, hidden bool) (bool, bool) {
 	v, _ := a.settings.Get("win_" + key)
 	parts := strings.Split(v, ",")
 	if len(parts) != 5 {
-		return false
+		return false, false
 	}
 	var n [5]int32
 	for i, s := range parts {
 		x, err := strconv.Atoi(strings.TrimSpace(s))
 		if err != nil {
-			return false
+			return false, false
 		}
 		n[i] = int32(x)
 	}
 	r := win.RECT{Left: n[0], Top: n[1], Right: n[2], Bottom: n[3]}
 	if r.Right-r.Left < 200 || r.Bottom-r.Top < 150 {
-		return false
+		return false, false
 	}
 	if m, _, _ := procMonitorFromRect.Call(uintptr(unsafe.Pointer(&r)), 0); m == 0 {
-		return false // a mentett hely már nincs egyik képernyőn sem
+		return false, false // a mentett hely már nincs egyik képernyőn sem
 	}
 	dlog("ablakhely visszaállítása (%s): %s", key, v)
+	maxed := n[4] == 1
 	wp := win.WINDOWPLACEMENT{RcNormalPosition: r, ShowCmd: win.SW_SHOWNORMAL}
-	if n[4] == 1 {
+	switch {
+	case hidden:
+		wp.ShowCmd = win.SW_HIDE
+	case maxed:
 		wp.ShowCmd = win.SW_SHOWMAXIMIZED
 	}
 	wp.Length = uint32(unsafe.Sizeof(wp))
-	return win.SetWindowPlacement(h, &wp)
+	return win.SetWindowPlacement(h, &wp), maxed
 }
 
 // sizeableDialog átméretezhetővé, teljes méretre nagyíthatóvá teszi a dialógust,

@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -290,5 +292,72 @@ func TestRemoteOverwrite(t *testing.T) {
 		g, err := dialRemote(remoteConf{Proto: "ftp", Host: "127.0.0.1", Port: 2121, User: "teszt", Pass: "jelszo"})
 		must(t, err)
 		t.Run("ftp", func(t *testing.T) { overwriteCheck(t, g, g.StartDir()) })
+	}
+}
+
+// stallProgress: az első adag után megáll, amíg a release csatornát be nem zárják
+// (egy lassú, hosszú letöltést utánoz).
+type stallProgress struct {
+	nopProgress
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (s *stallProgress) Add(n int64) {
+	if n > 0 {
+		s.once.Do(func() { close(s.started) })
+		<-s.release
+	}
+}
+
+// parallelCheck: futó letöltés közben a listázásnak azonnal válaszolnia kell
+// (korábban a felület megvárta a teljes átvitelt, és addig „lefagyott”).
+func parallelCheck(t *testing.T, f remoteVFS, base, localRoot string) {
+	big := make([]byte, 4<<20)
+	must(t, os.WriteFile(filepath.Join(localRoot, "nagy.bin"), big, 0o644))
+	pr := &stallProgress{started: make(chan struct{}), release: make(chan struct{})}
+	done := make(chan error, 1)
+	back := t.TempDir()
+	go func() {
+		done <- f.Download([]*Entry{{Name: "nagy.bin", Path: path.Join(base, "nagy.bin"), Size: int64(len(big))}}, back, pr)
+	}()
+	select {
+	case <-pr.started:
+	case err := <-done:
+		t.Fatal("a letöltés túl korán véget ért:", err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("a letöltés nem indult el")
+	}
+	listed := make(chan error, 1)
+	go func() { _, err := f.List(base); listed <- err }()
+	select {
+	case err := <-listed:
+		must(t, err)
+	case <-time.After(3 * time.Second):
+		close(pr.release)
+		t.Fatal("letöltés közben a listázás várakozik")
+	}
+	close(pr.release)
+	must(t, <-done)
+	if st, err := os.Stat(filepath.Join(back, "nagy.bin")); err != nil || st.Size() != int64(len(big)) {
+		t.Fatal("hiányos letöltés", err)
+	}
+}
+
+func TestRemoteParallel(t *testing.T) {
+	root := t.TempDir()
+	host, port := startSFTP(t, root)
+	conf := remoteConf{Proto: "sftp", Host: host, Port: port, User: "teszt", Pass: "titok",
+		KnownHosts: filepath.Join(t.TempDir(), "kh"), ConfirmHost: func(string, string, bool) bool { return true }}
+	f, err := dialRemote(conf)
+	must(t, err)
+	defer f.Close()
+	t.Run("sftp", func(t *testing.T) { parallelCheck(t, f, root, root) })
+	if r := os.Getenv("GZ_FTP_ROOT"); r != "" {
+		g, err := dialRemote(remoteConf{Proto: "ftp", Host: "127.0.0.1", Port: 2121, User: "teszt", Pass: "jelszo"})
+		must(t, err)
+		defer g.Close()
+		t.Run("ftp", func(t *testing.T) { parallelCheck(t, g, g.StartDir(), r) })
 	}
 }

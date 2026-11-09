@@ -4,7 +4,7 @@ package main
 
 const appName = "Gozie Commander"
 const appDir = "GozieCommander" // mappanév (beállítások, ideiglenes fájlok)
-const appVersion = "0.48"
+const appVersion = "0.49"
 
 // aboutText: a Névjegy ablak szövege.
 func aboutText() string {

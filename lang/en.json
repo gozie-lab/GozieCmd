@@ -886,6 +886,7 @@
  "a forrás és a cél ugyanaz": "source and target are the same",
  "a fájl nem nagyobb a darabméretnél, nincs mit darabolni": "the file is not larger than the part size, nothing to split",
  "a gép nem válaszol időben": "the computer does not respond in time",
+ "a kapcsolat megszakadt": "the connection was lost",
  "a kiadásban nincs ehhez a rendszerhez való csomag": "the release has no package for this system",
  "a kiadásból hiányzik az ellenőrzőösszeg-fájl": "the release has no checksum file",
  "a kulcsfájl jelmondattal védett: add meg a jelszó mezőben": "the key file is passphrase-protected: enter it in the password field",

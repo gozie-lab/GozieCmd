@@ -382,9 +382,50 @@ func startSelf() {
 	c.Process.Release()
 }
 
-// releaseNotes: a kiadás leírása a kérdésablakba (rövidítve).
+// releaseNotes: a kiadás leírása a kérdésablakba (rövidítve). A leírás kétnyelvű
+// (VALTOZASOK.md): minden pont magyarul, alatta dőlt betűvel angolul; a felület
+// nyelvén lévő változat marad meg, a Markdown-jelölések nélkül.
 func releaseNotes(r *release) string {
-	s := strings.TrimSpace(strings.ReplaceAll(r.Body, "\r", ""))
+	return notesFor(r.Body, curLang == "en")
+}
+
+func notesFor(body string, en bool) string {
+	var out []string
+	var hu []string
+	var eng string
+	flush := func() {
+		if len(hu) == 0 {
+			return
+		}
+		if en && eng != "" {
+			out = append(out, "• "+eng)
+		} else {
+			out = append(out, "• "+strings.Join(hu, " "))
+		}
+		hu, eng = nil, ""
+	}
+	clean := func(t string) string {
+		return strings.NewReplacer("**", "", "`", "").Replace(t)
+	}
+	for _, ln := range strings.Split(strings.ReplaceAll(body, "\r", ""), "\n") {
+		t := strings.TrimSpace(ln)
+		switch {
+		case t == "", strings.HasPrefix(t, "**Letöltés"):
+			flush()
+		case strings.HasPrefix(t, "- "), strings.HasPrefix(t, "* "):
+			flush()
+			hu = append(hu, clean(t[2:]))
+		case len(t) > 2 && t[0] == '*' && t[len(t)-1] == '*' && !strings.HasPrefix(t, "**"):
+			eng = clean(strings.Trim(t, "*"))
+		case len(hu) > 0:
+			hu = append(hu, clean(t))
+		default:
+			flush()
+			out = append(out, clean(t))
+		}
+	}
+	flush()
+	s := strings.Join(out, "\n")
 	if len([]rune(s)) > 900 {
 		s = string([]rune(s)[:900]) + " …"
 	}

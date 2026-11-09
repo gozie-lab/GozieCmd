@@ -143,3 +143,16 @@ func TestAutoCheckDue(t *testing.T) {
 		t.Error("kikapcsolva")
 	}
 }
+
+func TestReleaseNotes(t *testing.T) {
+	body := "- SFTP: első sor\n  folytatás.\n  *SFTP: first line.*\n- Windows: ablak.\n  *Windows: window.*\n\n**Letöltés / Download:** `x.zip`\n"
+	if got, want := notesFor(body, false), "• SFTP: első sor folytatás.\n• Windows: ablak."; got != want {
+		t.Fatalf("magyar:\n%q\n%q", got, want)
+	}
+	if got, want := notesFor(body, true), "• SFTP: first line.\n• Windows: window."; got != want {
+		t.Fatalf("angol:\n%q\n%q", got, want)
+	}
+	if got := notesFor("Gozie Commander 0.49", false); got != "Gozie Commander 0.49" {
+		t.Fatal(got)
+	}
+}

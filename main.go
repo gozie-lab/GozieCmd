@@ -219,16 +219,29 @@ func main() {
 		first = app.right
 	}
 	app.setActive(first)
-	// A mentett méretet a walk induló méretezése UTÁN állítjuk vissza (különben
-	// felülírja), az ablak addig rejtve marad.
+	// Indulás villanás nélkül: a mentett helyet és méretet még a megjelenés előtt,
+	// rejtve állítjuk be, az ablakot pedig „letakarva” (DWM cloak) mutatjuk meg, amíg
+	// az elrendezés és a kirajzolás le nem fut. Így nem látszik sem az alapméret,
+	// sem a félig kirajzolt, fehér terület.
+	placed, maxed := placeWindow(app, app.mw.Handle(), "main", true)
+	dlog("ablakhely visszaállítása: %v (teljes méret: %v)", placed, maxed)
 	app.mw.Starting().Attach(func() {
 		app.mw.Synchronize(func() {
-			ok := restorePlacement(app, app.mw.Handle(), "main")
-			dlog("ablakhely visszaállítása: %v", ok)
+			h := app.mw.Handle()
+			cloakWindow(h, true)
+			if maxed {
+				win.ShowWindow(h, win.SW_SHOWMAXIMIZED)
+			} else {
+				win.ShowWindow(h, win.SW_SHOWNORMAL) // a walk Show() magától nem aktiválná
+			}
 			app.mw.Show()
 			first.tv.SetFocus()
-			app.startUpdateCheck()
-			app.initPasswordPrompt()
+			app.mw.Synchronize(func() { // a függő elrendezés után
+				win.RedrawWindow(h, nil, 0, win.RDW_INVALIDATE|win.RDW_ERASE|win.RDW_FRAME|win.RDW_ALLCHILDREN|win.RDW_UPDATENOW)
+				cloakWindow(h, false)
+				app.startUpdateCheck()
+				app.initPasswordPrompt()
+			})
 		})
 	})
 

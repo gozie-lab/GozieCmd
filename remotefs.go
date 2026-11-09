@@ -185,7 +185,11 @@ type genFS struct {
 	display string // pl. sftp://user@host:22
 	info    string
 	start   string
-	mu      sync.Mutex // egyszerre egy művelet a kapcsolaton
+	// A műveletek párhuzamosan futhatnak (az SFTP, a WebDAV és az SMB is bírja), így egy
+	// hosszú háttérmásolás alatt is azonnal listázható a mappa. Csak az újracsatlakozás
+	// kizárólagos.
+	mu      sync.RWMutex
+	gen     uint64 // hányadik kapcsolat (újracsatlakozáskor nő)
 	idleTrack
 }
 
@@ -229,15 +233,24 @@ func isConnErr(err error) bool {
 func (f *genFS) do(fn func() error) error {
 	f.enter()
 	defer f.leave()
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	f.mu.RLock()
+	gen := f.gen
 	err := fn()
+	f.mu.RUnlock()
 	if err == nil || errors.Is(err, errCancel) || !isConnErr(err) {
 		return err
 	}
-	if rerr := f.raw.reconnect(); rerr != nil {
-		return err
+	f.mu.Lock()
+	if f.gen == gen { // más még nem csatlakozott újra helyettünk
+		if rerr := f.raw.reconnect(); rerr != nil {
+			f.mu.Unlock()
+			return err
+		}
+		f.gen++
 	}
+	f.mu.Unlock()
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	return fn()
 }
 

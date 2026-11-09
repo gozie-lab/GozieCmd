@@ -29,6 +29,14 @@ jobs:
         run: |
           mkdir -p dist && sh ./package.sh "$PWD/dist"
           cd dist && sha256sum GozieCmd-* > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Kiadási jegyzet / Release notes
+        run: |
+          VER=$(sed -n 's/^const appVersion = "\(.*\)"/\1/p' version.go)
+          echo "VER=$VER" >> "$GITHUB_ENV"
+          awk -v v="## $VER" '$0==v{on=1;next} /^## /{on=0} on' VALTOZASOK.md > notes.md
+          [ -s notes.md ] || echo "Gozie Commander $VER" > notes.md
+          printf '\n**Letöltés / Download:** Windows: `GozieCmd-%s-windows.zip`, Linux: `GozieCmd-%s-linux-x86_64.tar.gz`\n' "$VER" "$VER" >> notes.md
+          cat notes.md
       - uses: actions/upload-artifact@v4
         with:
           name: GozieCmd
@@ -37,4 +45,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          name: Gozie Commander ${{ env.VER }}
+          body_path: notes.md
           files: dist/*

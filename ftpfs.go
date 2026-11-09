@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jlaffaye/ftp"
@@ -21,9 +22,15 @@ import (
 
 type ftpFS struct {
 	conf  ftpConf
-	c     *ftp.ServerConn
 	start string
 	idleTrack
+
+	// Az FTP-kapcsolaton egyszerre csak egy parancs futhat. Ha egy háttérmásolás
+	// foglalja, a felület (listázás, frissítés) egy második kapcsolatot kap, így
+	// nem kell megvárnia az átvitel végét.
+	pmu    sync.Mutex
+	idle   []*ftp.ServerConn
+	closed bool
 }
 
 func (f *ftpFS) StartDir() string { return f.start }
@@ -36,19 +43,21 @@ func dialFTP(conf ftpConf) (*ftpFS, error) {
 		conf.User, conf.Pass = "anonymous", "anonymous@"
 	}
 	f := &ftpFS{conf: conf}
-	if err := f.connect(); err != nil {
+	c, err := f.dial()
+	if err != nil {
 		return nil, err
 	}
 	f.start = "/"
 	if conf.Dir != "" {
 		f.start = path.Clean("/" + strings.ReplaceAll(conf.Dir, `\`, "/"))
-	} else if d, err := f.c.CurrentDir(); err == nil && strings.HasPrefix(d, "/") {
+	} else if d, err := c.CurrentDir(); err == nil && strings.HasPrefix(d, "/") {
 		f.start = d
 	}
+	f.put(c)
 	return f, nil
 }
 
-func (f *ftpFS) connect() error {
+func (f *ftpFS) dial() (*ftp.ServerConn, error) {
 	addr := net.JoinHostPort(f.conf.Host, strconv.Itoa(f.conf.Port))
 	opts := []ftp.DialOption{ftp.DialWithTimeout(20 * time.Second)}
 	if f.conf.TLS {
@@ -59,43 +68,71 @@ func (f *ftpFS) connect() error {
 	}
 	c, err := ftp.Dial(addr, opts...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := c.Login(f.conf.User, f.conf.Pass); err != nil {
 		c.Quit()
-		return err
+		return nil, err
 	}
-	f.c = c
-	return nil
+	return c, nil
 }
 
-// do lefuttatja a parancsot; megszakadt kapcsolatnál egyszer újracsatlakozik.
+// get egy szabad kapcsolatot ad, ha nincs, újat nyit.
+func (f *ftpFS) get() (*ftp.ServerConn, error) {
+	f.pmu.Lock()
+	if n := len(f.idle); n > 0 {
+		c := f.idle[n-1]
+		f.idle = f.idle[:n-1]
+		f.pmu.Unlock()
+		return c, nil
+	}
+	f.pmu.Unlock()
+	return f.dial()
+}
+
+// put visszaadja a kapcsolatot; legfeljebb kettőt tart nyitva.
+func (f *ftpFS) put(c *ftp.ServerConn) {
+	f.pmu.Lock()
+	if !f.closed && len(f.idle) < 2 {
+		f.idle = append(f.idle, c)
+		c = nil
+	}
+	f.pmu.Unlock()
+	if c != nil {
+		go c.Quit()
+	}
+}
+
+// do lefuttatja a parancsot egy szabad kapcsolaton; megszakadt kapcsolatnál egyszer
+// újracsatlakozik. Megszakított átvitel után a kapcsolatot eldobja (nem tiszta).
 func (f *ftpFS) do(fn func(c *ftp.ServerConn) error) error {
 	f.enter()
 	defer f.leave()
-	if f.c == nil {
-		if err := f.connect(); err != nil {
-			return err
-		}
+	c, err := f.get()
+	if err != nil {
+		return err
 	}
-	err := fn(f.c)
+	err = fn(c)
 	var te *textproto.Error
-	if err == nil || errors.As(err, &te) && te.Code != 421 || errors.Is(err, errCancel) {
+	if err == nil || errors.As(err, &te) && te.Code != 421 {
+		f.put(c)
 		return err
 	}
-	f.reconnect()
-	if f.c == nil {
+	go c.Quit()
+	if errors.Is(err, errCancel) {
 		return err
 	}
-	return fn(f.c)
-}
-
-func (f *ftpFS) reconnect() {
-	if f.c != nil {
-		f.c.Quit()
-		f.c = nil
+	c2, derr := f.dial()
+	if derr != nil {
+		return err
 	}
-	f.connect()
+	err = fn(c2)
+	if err == nil || errors.As(err, &te) && te.Code != 421 {
+		f.put(c2)
+	} else {
+		go c2.Quit()
+	}
+	return err
 }
 
 func (f *ftpFS) Kind() string { return "ftp" }
@@ -110,9 +147,12 @@ func (f *ftpFS) Info() string {
 }
 
 func (f *ftpFS) Close() {
-	if f.c != nil {
-		f.c.Quit()
-		f.c = nil
+	f.pmu.Lock()
+	idle := f.idle
+	f.idle, f.closed = nil, true
+	f.pmu.Unlock()
+	for _, c := range idle {
+		go c.Quit()
 	}
 }
 
@@ -285,7 +325,6 @@ func (f *ftpFS) Download(items []*Entry, localDir string, pr Progress) error {
 		if err != nil {
 			os.Remove(target)
 			if errors.Is(err, errCancel) {
-				f.reconnect() // a félbehagyott átvitel után tiszta kapcsolat kell
 				return errCancel
 			}
 			pr.Err(rf.path, err)
@@ -386,7 +425,6 @@ func (f *ftpFS) Upload(srcs []string, remoteDir string, pr Progress) error {
 		})
 		if err != nil {
 			if errors.Is(err, errCancel) {
-				f.reconnect()
 				f.do(func(c *ftp.ServerConn) error { return c.Delete(remote) }) // félkész fájl
 				return errCancel
 			}
