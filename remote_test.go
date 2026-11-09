@@ -361,3 +361,48 @@ func TestRemoteParallel(t *testing.T) {
 		t.Run("ftp", func(t *testing.T) { parallelCheck(t, g, g.StartDir(), r) })
 	}
 }
+
+// halfRaw: a feltöltésből csak a felét írja ki, hiba nélkül (egy hibás szervert utánoz).
+type halfRaw struct {
+	rawFS
+	root string
+}
+
+func (h halfRaw) put(p string, in io.Reader, size int64) error {
+	b, _ := io.ReadAll(in)
+	return os.WriteFile(filepath.Join(h.root, p), b[:len(b)/2], 0o644)
+}
+func (h halfRaw) size(p string) (int64, error) {
+	st, err := os.Stat(filepath.Join(h.root, p))
+	if err != nil {
+		return 0, err
+	}
+	return st.Size(), nil
+}
+func (h halfRaw) list(string) ([]rawInfo, error)  { return nil, nil }
+func (h halfRaw) remove(p string, _ bool) error   { return os.Remove(filepath.Join(h.root, p)) }
+func (h halfRaw) chtimes(string, time.Time) error { return nil }
+
+type errCount struct {
+	nopProgress
+	n int
+}
+
+func (e *errCount) Err(string, error) { e.n++ }
+
+// A hiányosan megérkezett fájl hibának számít, és nem marad ott a valódi nevén
+// (mozgatásnál így a forrás sem törlődik).
+func TestUploadSizeCheck(t *testing.T) {
+	root, local := t.TempDir(), t.TempDir()
+	src := filepath.Join(local, "a.bin")
+	must(t, os.WriteFile(src, make([]byte, 1000), 0o644))
+	f := &genFS{raw: halfRaw{root: root}, kind: "sftp"}
+	pr := &errCount{}
+	must(t, f.Upload([]string{src}, "/", pr))
+	if pr.n != 1 {
+		t.Fatalf("hibák: %d", pr.n)
+	}
+	if _, err := os.Stat(filepath.Join(root, "a.bin")); err == nil {
+		t.Fatal("a hiányos fájl ott maradt")
+	}
+}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/lxn/walk"
+	. "github.com/lxn/walk/declarative"
 	"github.com/lxn/win"
 )
 
@@ -43,9 +44,7 @@ func (a *App) checkUpdate(manual bool) {
 					walk.MsgBox(a.mw, T("Programfrissítés"), fmt.Sprintf(T("A legújabb verziót használod (%s)."), appVersion), walk.MsgBoxIconInformation)
 				}
 			default:
-				if walk.MsgBox(a.mw, T("Programfrissítés"), updateAvailableText(r), walk.MsgBoxYesNo|walk.MsgBoxIconQuestion) == win.IDYES {
-					a.installRelease(r)
-				}
+				a.offerUpdate(r)
 			}
 		})
 	}()
@@ -87,4 +86,47 @@ func (a *App) installRelease(r *release) {
 	dlog("frissítve: %s -> %s", appVersion, r.version())
 	restartAfterExit = true
 	a.mw.Close() // ha egy háttérművelet miatt nem lép ki, a következő kilépéskor indul az új
+}
+
+// offerUpdate: Letöltés és telepítés / Újdonságok (a GitHubon) / Később.
+func (a *App) offerUpdate(r *release) {
+	for {
+		var dlg *walk.Dialog
+		var yes, later *walk.PushButton
+		res := 0
+		err := Dialog{
+			AssignTo:      &dlg,
+			Title:         T("Programfrissítés"),
+			DefaultButton: &yes,
+			CancelButton:  &later,
+			MinSize:       Size{Width: 460, Height: 150},
+			Layout:        VBox{},
+			Children: []Widget{
+				Label{Text: updateAvailableText(r)},
+				Composite{
+					Layout: HBox{MarginsZero: true},
+					Children: []Widget{
+						PushButton{AssignTo: &yes, Text: T("Letöltés és telepítés"), OnClicked: func() { res = 1; dlg.Accept() }},
+						PushButton{Text: T("Újdonságok"), OnClicked: func() { res = 2; dlg.Accept() }},
+						HSpacer{},
+						PushButton{AssignTo: &later, Text: T("Később"), OnClicked: func() { dlg.Cancel() }},
+					},
+				},
+			},
+		}.Create(a.mw)
+		if err != nil {
+			return
+		}
+		themeDialog(dlg)
+		dlg.Run()
+		switch res {
+		case 1:
+			a.installRelease(r)
+			return
+		case 2:
+			shellOpen(a.mw.Handle(), r.notesURL(), "") // utána újra kérdez
+		default:
+			return
+		}
+	}
 }

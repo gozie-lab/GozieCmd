@@ -3,6 +3,21 @@
 A kiadások leírása innen készül: a GitHub Actions a verzióhoz tartozó szakaszt
 teszi a kiadás oldalára. Új kiadás előtt ide kerül egy új `## X.YY` szakasz.
 
+## 0.50
+
+- Feltöltés és letöltés után a program ellenőrzi, hogy a fájl teljes méretében
+  megérkezett-e. Ha nem, hibát jelez, a hiányos fájlt eltávolítja a szerverről, és
+  mozgatásnál a helyi példány megmarad.
+  *Uploads and downloads are verified by size; an incomplete file is reported and
+  removed, and on move the local copy is kept.*
+- SFTP: az életjel-ellenőrzés átvitel közben szünetel, így egy lassú feltöltést
+  nem szakít meg tévesen.
+  *SFTP: the keep-alive check pauses during transfers, so it can't cut a slow upload.*
+- Linux: a fájlkezelőből behúzott fájlok mozgatásakor hiba esetén a forrás megmarad.
+  *Linux: when moving files dropped from another file manager, sources are kept on error.*
+- Frissítéskor az „Újdonságok” gomb a GitHubon nyitja meg a változások listáját.
+  *The update prompt has a “What's new” button that opens the change list on GitHub.*
+
 ## 0.49
 
 - SFTP: egy hosszabb letöltés vagy feltöltés közben a program nem fagy le többé.

@@ -53,6 +53,7 @@ type release struct {
 	Tag    string     `json:"tag_name"`
 	Name   string     `json:"name"`
 	Body   string     `json:"body"`
+	Page   string     `json:"html_url"`
 	Assets []relAsset `json:"assets"`
 }
 
@@ -382,54 +383,12 @@ func startSelf() {
 	c.Process.Release()
 }
 
-// releaseNotes: a kiadás leírása a kérdésablakba (rövidítve). A leírás kétnyelvű
-// (VALTOZASOK.md): minden pont magyarul, alatta dőlt betűvel angolul; a felület
-// nyelvén lévő változat marad meg, a Markdown-jelölések nélkül.
-func releaseNotes(r *release) string {
-	return notesFor(r.Body, curLang == "en")
-}
-
-func notesFor(body string, en bool) string {
-	var out []string
-	var hu []string
-	var eng string
-	flush := func() {
-		if len(hu) == 0 {
-			return
-		}
-		if en && eng != "" {
-			out = append(out, "• "+eng)
-		} else {
-			out = append(out, "• "+strings.Join(hu, " "))
-		}
-		hu, eng = nil, ""
+// notesURL: a kiadás oldala a GitHubon, ahol a változások teljes listája olvasható.
+func (r *release) notesURL() string {
+	if strings.HasPrefix(r.Page, "https://github.com/") {
+		return r.Page
 	}
-	clean := func(t string) string {
-		return strings.NewReplacer("**", "", "`", "").Replace(t)
-	}
-	for _, ln := range strings.Split(strings.ReplaceAll(body, "\r", ""), "\n") {
-		t := strings.TrimSpace(ln)
-		switch {
-		case t == "", strings.HasPrefix(t, "**Letöltés"):
-			flush()
-		case strings.HasPrefix(t, "- "), strings.HasPrefix(t, "* "):
-			flush()
-			hu = append(hu, clean(t[2:]))
-		case len(t) > 2 && t[0] == '*' && t[len(t)-1] == '*' && !strings.HasPrefix(t, "**"):
-			eng = clean(strings.Trim(t, "*"))
-		case len(hu) > 0:
-			hu = append(hu, clean(t))
-		default:
-			flush()
-			out = append(out, clean(t))
-		}
-	}
-	flush()
-	s := strings.Join(out, "\n")
-	if len([]rune(s)) > 900 {
-		s = string([]rune(s)[:900]) + " …"
-	}
-	return s
+	return "https://github.com/" + updateRepo + "/releases/tag/" + r.Tag
 }
 
 // autoCheckDue: az automatikus keresés be van-e kapcsolva, és eltelt-e egy nap.
@@ -454,9 +413,5 @@ func (a *App) updateCheckOn() bool {
 }
 
 func updateAvailableText(r *release) string {
-	msg := fmt.Sprintf(T("Elérhető az új verzió: %s (most: %s).\n\nLetöltsem és telepítsem? A program utána újraindul."), r.version(), appVersion)
-	if n := releaseNotes(r); n != "" {
-		msg += "\n\n" + T("Újdonságok:") + "\n" + n
-	}
-	return msg
+	return fmt.Sprintf(T("Elérhető az új verzió: %s (most: %s).\n\nLetöltsem és telepítsem? A program utána újraindul.\nA változások listája az „Újdonságok” gombbal a GitHubon olvasható."), r.version(), appVersion)
 }

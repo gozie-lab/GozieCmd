@@ -130,7 +130,9 @@ func (a *App) openFile(path string) {
 		args = []string{"open", path}
 	}
 	c := exec.Command(opener, args...)
-	c.Dir = dir
+	if st, err := os.Stat(dir); err == nil && st.IsDir() { // webcímnél nincs munkamappa
+		c.Dir = dir
+	}
 	if err := startDetached(c); err != nil {
 		a.warn(fmt.Sprintf(T("A fájl nem nyitható meg:\n%s"), errText(err)))
 	}

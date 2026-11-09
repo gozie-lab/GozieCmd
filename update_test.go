@@ -144,15 +144,17 @@ func TestAutoCheckDue(t *testing.T) {
 	}
 }
 
-func TestReleaseNotes(t *testing.T) {
-	body := "- SFTP: első sor\n  folytatás.\n  *SFTP: first line.*\n- Windows: ablak.\n  *Windows: window.*\n\n**Letöltés / Download:** `x.zip`\n"
-	if got, want := notesFor(body, false), "• SFTP: első sor folytatás.\n• Windows: ablak."; got != want {
-		t.Fatalf("magyar:\n%q\n%q", got, want)
-	}
-	if got, want := notesFor(body, true), "• SFTP: first line.\n• Windows: window."; got != want {
-		t.Fatalf("angol:\n%q\n%q", got, want)
-	}
-	if got := notesFor("Gozie Commander 0.49", false); got != "Gozie Commander 0.49" {
+func TestReleaseNotesURL(t *testing.T) {
+	r := &release{Tag: "v0.50"}
+	if got := r.notesURL(); got != "https://github.com/"+updateRepo+"/releases/tag/v0.50" {
 		t.Fatal(got)
+	}
+	r.Page = "https://github.com/x/y/releases/tag/v0.50"
+	if r.notesURL() != r.Page {
+		t.Fatal("html_url")
+	}
+	r.Page = "https://rossz.example/"
+	if r.notesURL() == r.Page {
+		t.Fatal("idegen cím")
 	}
 }

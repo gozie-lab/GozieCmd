@@ -171,6 +171,7 @@ type rawFS interface {
 	list(dir string) ([]rawInfo, error)
 	open(p string) (io.ReadCloser, error)
 	put(p string, r io.Reader, size int64) error
+	size(p string) (int64, error)
 	mkdir(p string) error
 	remove(p string, dir bool) error
 	rename(from, to string) error
@@ -376,9 +377,12 @@ func (f *genFS) Download(items []*Entry, localDir string, pr Progress) error {
 			if err != nil {
 				return err
 			}
-			_, err = io.Copy(out, progressReader{in, pr})
+			n, err := io.Copy(out, progressReader{in, pr})
 			if cerr := out.Close(); err == nil {
 				err = cerr
+			}
+			if err == nil && rf.size > 0 && n != rf.size {
+				err = sizeMismatch(n, rf.size)
 			}
 			return err
 		})
@@ -498,11 +502,14 @@ func (f *genFS) Upload(srcs []string, remoteDir string, pr Progress) error {
 				return err
 			}
 			defer in.Close()
-			return f.raw.put(remote, &seekProgress{in, pr}, u.size)
+			if err := f.raw.put(remote, &seekProgress{in, pr}, u.size); err != nil {
+				return err
+			}
+			return checkSize(f.raw.size(remote))(u.size)
 		})
 		if err != nil {
+			f.do(func() error { return f.raw.remove(remote, false) }) // félkész fájl ne maradjon
 			if errors.Is(err, errCancel) {
-				f.do(func() error { return f.raw.remove(remote, false) }) // félkész fájl
 				return errCancel
 			}
 			pr.Err(u.local, err)
@@ -650,4 +657,19 @@ func (a *App) idleMinutes() int {
 		return 15
 	}
 	return n
+}
+
+// checkSize: a feltöltött fájl mérete egyezik-e a helyivel. Ha a szerver nem tudja
+// megmondani a méretet, nem tekintjük hibának.
+func checkSize(got int64, err error) func(want int64) error {
+	return func(want int64) error {
+		if err != nil || got == want {
+			return nil
+		}
+		return sizeMismatch(got, want)
+	}
+}
+
+func sizeMismatch(got, want int64) error {
+	return fmt.Errorf(T("hiányos átvitel: %s érkezett meg a %s helyett"), fmtSize(got), fmtSize(want))
 }

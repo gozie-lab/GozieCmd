@@ -421,11 +421,14 @@ func (f *ftpFS) Upload(srcs []string, remoteDir string, pr Progress) error {
 				return err
 			}
 			defer in.Close()
-			return c.Stor(remote, progressReader{in, pr})
+			if err := c.Stor(remote, progressReader{in, pr}); err != nil {
+				return err
+			}
+			return checkSize(c.FileSize(remote))(u.size)
 		})
 		if err != nil {
+			f.do(func(c *ftp.ServerConn) error { return c.Delete(remote) }) // félkész fájl ne maradjon
 			if errors.Is(err, errCancel) {
-				f.do(func(c *ftp.ServerConn) error { return c.Delete(remote) }) // félkész fájl
 				return errCancel
 			}
 			pr.Err(u.local, err)

@@ -81,7 +81,7 @@ func (a *App) copyIn(files []string, p *Panel, target string, move bool) {
 	if p.vfs != nil {
 		a.runJob(T("Másolás"), func(j *job) error {
 			err := importPaths(p.vfs, files, p.vpath, j)
-			if err == nil && move {
+			if err == nil && move && j.Clean() { // hiba vagy kihagyás esetén a forrás megmarad
 				removeLocal(files, j)
 			}
 			return err

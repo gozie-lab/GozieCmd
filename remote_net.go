@@ -31,6 +31,7 @@ const dialTimeout = 20 * time.Second
 
 type sftpRaw struct {
 	conf remoteConf
+	busy func() bool // fut-e éppen átvitel (akkor nem kell életjel)
 	mu   sync.Mutex // csak a mezőkhöz; maguk a műveletek párhuzamosan futhatnak
 	ssh  *ssh.Client
 	c    *sftp.Client
@@ -46,6 +47,9 @@ func dialSFTP(conf remoteConf) (*genFS, error) {
 	}
 	f := &genFS{raw: r, kind: "sftp", info: "SFTP: " + conf.Host,
 		display: displayURL("sftp", conf.User, conf.Host, conf.Port, 22)}
+	r.mu.Lock()
+	r.busy = func() bool { _, b := f.Idle(); return b }
+	r.mu.Unlock()
 	f.start = "/"
 	if conf.Dir != "" {
 		f.start = path.Clean("/" + strings.ReplaceAll(conf.Dir, `\`, "/"))
@@ -202,17 +206,24 @@ func (r *sftpRaw) connect() error {
 	r.mu.Lock()
 	r.ssh, r.c = cl, c
 	r.mu.Unlock()
-	go sshKeepalive(cl)
+	go sshKeepalive(cl, r.isBusy)
 	return nil
 }
 
 // sshKeepalive félpercenként jelez a szervernek. Ha a kapcsolat csendben elhalt
 // (alvó gép, Wi-Fi-váltás, tűzfal), a választ nem kapja meg, és bontja a kapcsolatot:
 // így a rajta várakozó műveletek hibával visszatérnek, ahelyett hogy örökké várnának.
-func sshKeepalive(cl *ssh.Client) {
+//
+// Átvitel közben nem kérdez: egy lassú feltöltésnél a válasz a kimenő adatok mögött
+// sorban állva akár percekig is késhet, és ilyenkor tévesen bontaná a kapcsolatot.
+// Ha az átvitel közben szakad meg a hálózat, azt maga az átvitel jelzi hibával.
+func sshKeepalive(cl *ssh.Client, busy func() bool) {
 	t := time.NewTicker(30 * time.Second)
 	defer t.Stop()
 	for range t.C {
+		if busy != nil && busy() {
+			continue
+		}
 		res := make(chan error, 1)
 		go func() {
 			_, _, err := cl.SendRequest("keepalive@openssh.com", true, nil)
@@ -326,6 +337,25 @@ func (r *sftpRaw) put(p string, in io.Reader, size int64) error {
 	return err
 }
 
+func (r *sftpRaw) isBusy() bool {
+	r.mu.Lock()
+	b := r.busy
+	r.mu.Unlock()
+	return b != nil && b()
+}
+
+func (r *sftpRaw) size(p string) (int64, error) {
+	c, err := r.client()
+	if err != nil {
+		return 0, err
+	}
+	st, err := c.Stat(p)
+	if err != nil {
+		return 0, err
+	}
+	return st.Size(), nil
+}
+
 func (r *sftpRaw) mkdir(p string) error {
 	c, err := r.client()
 	if err != nil {
@@ -431,6 +461,13 @@ func (r *davRaw) list(dir string) ([]rawInfo, error) {
 
 func (r *davRaw) open(p string) (io.ReadCloser, error)         { return r.c.ReadStream(p) }
 func (r *davRaw) put(p string, in io.Reader, size int64) error { return r.c.WriteStream(p, in, 0o644) }
+func (r *davRaw) size(p string) (int64, error) {
+	st, err := r.c.Stat(p)
+	if err != nil {
+		return 0, err
+	}
+	return st.Size(), nil
+}
 func (r *davRaw) mkdir(p string) error                         { return r.c.Mkdir(p, 0o755) }
 func (r *davRaw) remove(p string, dir bool) error              { return r.c.Remove(p) }
 func (r *davRaw) rename(from, to string) error                 { return r.c.Rename(from, to, false) }
@@ -627,6 +664,18 @@ func (r *smbRaw) put(p string, in io.Reader, size int64) error {
 		err = cerr
 	}
 	return err
+}
+
+func (r *smbRaw) size(p string) (int64, error) {
+	sh, rel, err := r.split(p)
+	if err != nil {
+		return 0, err
+	}
+	st, err := sh.Stat(rel)
+	if err != nil {
+		return 0, err
+	}
+	return st.Size(), nil
 }
 
 func (r *smbRaw) mkdir(p string) error {

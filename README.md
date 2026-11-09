@@ -180,7 +180,7 @@ sh package.sh    # kiadási csomagok / release packages
 go test ./...
 ```
 
-Új kiadás / new release: `git tag v0.49 && git push --tags` – a GitHub Actions lefordítja és feltölti
+Új kiadás / new release: `git tag v0.50 && git push --tags` – a GitHub Actions lefordítja és feltölti
 a csomagokat (a címkének egyeznie kell a `version.go` verziószámával).
 
 A kiadás neve „Gozie Commander X.YY”, a leírása a `VALTOZASOK.md` megfelelő szakaszából készül – új kiadás előtt oda kell írni az újdonságokat. / The release is named “Gozie Commander X.YY”; its notes come from the matching section of `VALTOZASOK.md`.

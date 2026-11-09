@@ -45,7 +45,7 @@ func (a *App) checkUpdate(manual bool) {
 					dialog.ShowInformation(T("Programfrissítés"), fmt.Sprintf(T("A legújabb verziót használod (%s)."), appVersion), a.win)
 				}
 			default:
-				a.confirm(T("Programfrissítés"), updateAvailableText(r), T("Letöltés és telepítés"), func() { a.installRelease(r) })
+				a.offerUpdate(r)
 			}
 		})
 	}()
@@ -82,4 +82,18 @@ func (a *App) installRelease(r *release) {
 		restartAfterExit = true
 		a.quit()
 	})
+}
+
+// offerUpdate: Letöltés és telepítés / Újdonságok (a GitHubon) / Később.
+func (a *App) offerUpdate(r *release) {
+	a.choice(T("Programfrissítés"), updateAvailableText(r),
+		[]string{T("Letöltés és telepítés"), T("Újdonságok"), T("Később")}, 0, func(i int) {
+			switch i {
+			case 0:
+				a.installRelease(r)
+			case 1:
+				a.openFile(r.notesURL())
+				a.offerUpdate(r) // utána újra kérdez
+			}
+		})
 }
