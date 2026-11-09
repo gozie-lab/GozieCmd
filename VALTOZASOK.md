@@ -3,6 +3,21 @@
 A kiadások leírása innen készül: a GitHub Actions a verzióhoz tartozó szakaszt
 teszi a kiadás oldalára. Új kiadás előtt ide kerül egy új `## X.YY` szakasz.
 
+## 0.51
+
+- Titkosított FTP (FTPS): a feltöltés nem akad el többé a második fájlnál, és
+  nem marad hiányos vagy 0 bájtos fájl a szerveren. Az adatkapcsolat lezárása
+  most szabályos, így a szerver a fájl végét is megkapja; az adatkapcsolat a
+  vezérlőkapcsolat TLS-munkamenetét folytatja, ahogy sok szerver megköveteli.
+  *FTPS: uploads no longer stall on the second file or leave truncated files –
+  data connections are now closed properly and reuse the TLS session.*
+- SFTP, WebDAV, SMB: ha a szerver 40 másodpercig nem válaszol, a program újra
+  csatlakozik és megismétli a műveletet, ahelyett hogy örökké várna.
+  *SFTP, WebDAV, SMB: a server silent for 40 seconds triggers a reconnect and retry.*
+- Részletesebb napló az átvitelekről; az előző futás naplója `naplo-elozo.txt`
+  néven megmarad.
+  *More detailed transfer log; the previous run's log is kept as naplo-elozo.txt.*
+
 ## 0.50
 
 - Feltöltés és letöltés után a program ellenőrzi, hogy a fájl teljes méretében

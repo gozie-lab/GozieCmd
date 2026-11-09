@@ -111,7 +111,12 @@ func dlog(format string, args ...interface{}) {
 	fmt.Fprintf(f, time.Now().Format("15:04:05.000 ")+format+"\r\n", args...)
 }
 
+// dlogReset új naplót kezd; az előző futásé naplo-elozo.txt néven megmarad
+// (egy lefagyás után kilőtt program naplója így nem vész el az újraindítással).
 func dlogReset() {
 	os.MkdirAll(filepath.Dir(dlogPath()), 0o777)
+	prev := filepath.Join(filepath.Dir(dlogPath()), "naplo-elozo.txt")
+	os.Remove(prev)
+	os.Rename(dlogPath(), prev)
 	os.WriteFile(dlogPath(), nil, 0o666)
 }

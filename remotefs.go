@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -192,6 +193,13 @@ type genFS struct {
 	mu      sync.RWMutex
 	gen     uint64 // hányadik kapcsolat (újracsatlakozáskor nő)
 	idleTrack
+
+	// Őr: ha egy művelet sokáig semmit nem halad (a szerver nem válaszol), a kapcsolatot
+	// bontja, így a művelet hibával visszatér, és a do() újracsatlakozva megismétli.
+	ops      atomic.Int32
+	act      atomic.Int64 // az utolsó haladás ideje (UnixNano)
+	stallNow atomic.Bool  // az őr bontotta a kapcsolatot
+	dogRun   atomic.Bool  // fut-e az őr
 }
 
 func (f *genFS) Kind() string     { return f.kind }
@@ -230,17 +238,77 @@ func isConnErr(err error) bool {
 	return false
 }
 
+// stallLimit: ennyi ideig haladás nélkül álló műveletet az őr elakadtnak tekint.
+var stallLimit = 40 * time.Second
+
+func (f *genFS) touch() { f.act.Store(time.Now().UnixNano()) }
+
+func (f *genFS) watchdog() {
+	if !f.dogRun.CompareAndSwap(false, true) {
+		return
+	}
+	limit := stallLimit
+	go func() {
+		t := time.NewTicker(limit / 8)
+		defer t.Stop()
+		for range t.C {
+			idle := time.Since(time.Unix(0, f.act.Load()))
+			if f.ops.Load() == 0 {
+				if idle > time.Minute { // tétlen kapcsolat: az őr leáll, a következő művelet újraindítja
+					f.dogRun.Store(false)
+					if f.ops.Load() == 0 || !f.dogRun.CompareAndSwap(false, true) {
+						return
+					}
+				}
+				continue
+			}
+			if idle > limit {
+				dlog("%s: %v óta nincs válasz a szervertől, a kapcsolat újraindul", f.info, idle.Round(time.Second))
+				f.stallNow.Store(true)
+				f.touch()
+				f.raw.close()
+			}
+		}
+	}()
+}
+
+// touchReader minden olvasásnál jelzi az őrnek, hogy az átvitel halad.
+type touchReader struct {
+	r io.Reader
+	f *genFS
+}
+
+func (t touchReader) Read(b []byte) (int, error) {
+	n, err := t.r.Read(b)
+	if n > 0 {
+		t.f.touch()
+	}
+	return n, err
+}
+
 // do: egy művelet; megszakadt kapcsolatnál egyszer újracsatlakozik.
 func (f *genFS) do(fn func() error) error {
 	f.enter()
 	defer f.leave()
+	f.watchdog()
+	f.touch()
+	f.ops.Add(1)
+	defer func() { f.ops.Add(-1); f.touch() }()
 	f.mu.RLock()
 	gen := f.gen
 	err := fn()
 	f.mu.RUnlock()
+	if f.stallNow.Swap(false) && err != nil && !errors.Is(err, errCancel) {
+		dlog("%s: elakadt művelet hibája: %v", f.info, err)
+		err = fmt.Errorf("%w (%s)", err, T("a szerver nem válaszolt"))
+		if !isConnErr(err) {
+			return err
+		}
+	}
 	if err == nil || errors.Is(err, errCancel) || !isConnErr(err) {
 		return err
 	}
+	dlog("%s: kapcsolati hiba, újracsatlakozás: %v", f.info, err)
 	f.mu.Lock()
 	if f.gen == gen { // más még nem csatlakozott újra helyettünk
 		if rerr := f.raw.reconnect(); rerr != nil {
@@ -377,7 +445,7 @@ func (f *genFS) Download(items []*Entry, localDir string, pr Progress) error {
 			if err != nil {
 				return err
 			}
-			n, err := io.Copy(out, progressReader{in, pr})
+			n, err := io.Copy(out, touchReader{progressReader{in, pr}, f})
 			if cerr := out.Close(); err == nil {
 				err = cerr
 			}
@@ -406,6 +474,7 @@ func (f *genFS) Download(items []*Entry, localDir string, pr Progress) error {
 type seekProgress struct {
 	f  *os.File
 	pr Progress
+	g  *genFS // az őrnek jelzi a haladást (lehet nil)
 }
 
 func (s *seekProgress) Read(b []byte) (int, error) {
@@ -414,6 +483,9 @@ func (s *seekProgress) Read(b []byte) (int, error) {
 	}
 	n, err := s.f.Read(b)
 	s.pr.Add(int64(n))
+	if n > 0 && s.g != nil {
+		s.g.touch()
+	}
 	return n, err
 }
 
@@ -502,9 +574,13 @@ func (f *genFS) Upload(srcs []string, remoteDir string, pr Progress) error {
 				return err
 			}
 			defer in.Close()
-			if err := f.raw.put(remote, &seekProgress{in, pr}, u.size); err != nil {
+			t0 := time.Now()
+			dlog("%s: feltöltés: %s (%d bájt)", f.info, remote, u.size)
+			if err := f.raw.put(remote, &seekProgress{in, pr, f}, u.size); err != nil {
+				dlog("%s: feltöltés hiba: %s: %v", f.info, remote, err)
 				return err
 			}
+			dlog("%s: feltöltve %v alatt, méret ellenőrzése", f.info, time.Since(t0).Round(time.Millisecond))
 			return checkSize(f.raw.size(remote))(u.size)
 		})
 		if err != nil {
@@ -515,7 +591,9 @@ func (f *genFS) Upload(srcs []string, remoteDir string, pr Progress) error {
 			pr.Err(u.local, err)
 			continue
 		}
-		f.do(func() error { return f.raw.chtimes(remote, u.mod) })
+		if err := f.do(func() error { return f.raw.chtimes(remote, u.mod) }); err != nil {
+			dlog("%s: dátum beállítása nem sikerült: %s: %v", f.info, remote, err)
+		}
 	}
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/textproto"
 	"os"
@@ -61,10 +62,14 @@ func (f *ftpFS) dial() (*ftp.ServerConn, error) {
 	addr := net.JoinHostPort(f.conf.Host, strconv.Itoa(f.conf.Port))
 	opts := []ftp.DialOption{ftp.DialWithTimeout(20 * time.Second)}
 	if f.conf.TLS {
-		opts = append(opts, ftp.DialWithExplicitTLS(&tls.Config{
+		tc := &tls.Config{
 			ServerName:         f.conf.Host,
 			InsecureSkipVerify: f.conf.Insecure, //nolint:gosec // a felhasználó kifejezett kérésére
-		}))
+			// sok szerver megköveteli, hogy az adatkapcsolat a vezérlőkapcsolat
+			// TLS-munkamenetét folytassa (vsftpd: require_ssl_reuse)
+			ClientSessionCache: ftpsSessions,
+		}
+		opts = append(opts, ftp.DialWithExplicitTLS(tc), ftp.DialWithDialFunc(ftpsDialer(tc)))
 	}
 	c, err := ftp.Dial(addr, opts...)
 	if err != nil {
@@ -114,6 +119,9 @@ func (f *ftpFS) do(fn func(c *ftp.ServerConn) error) error {
 	}
 	err = fn(c)
 	var te *textproto.Error
+	if err != nil && !errors.Is(err, errCancel) {
+		dlog("FTP %s: %v", f.conf.Host, err)
+	}
 	if err == nil || errors.As(err, &te) && te.Code != 421 {
 		f.put(c)
 		return err
@@ -498,4 +506,51 @@ func (f *ftpFS) Rename(from, to string) error {
 func (f *ftpFS) Mkdir(dir, name string) error {
 	full := path.Join(dir, strings.ReplaceAll(name, `\`, "/"))
 	return f.do(func(c *ftp.ServerConn) error { return c.MakeDir(full) })
+}
+
+var ftpsSessions = tls.NewLRUClientSessionCache(32)
+
+// ftpsDialer: az első hívás a vezérlőkapcsolat (azt az ftp csomag maga emeli TLS-re),
+// a többi adatkapcsolat, amelyet itt csomagolunk TLS-be, szabályos lezárással.
+func ftpsDialer(tc *tls.Config) func(network, addr string) (net.Conn, error) {
+	var mu sync.Mutex
+	first := true
+	d := &net.Dialer{Timeout: 20 * time.Second}
+	return func(network, addr string) (net.Conn, error) {
+		mu.Lock()
+		control := first
+		first = false
+		mu.Unlock()
+		c, err := d.Dial(network, addr)
+		if err != nil || control {
+			return c, err
+		}
+		return &ftpsData{Conn: tls.Client(c, tc)}, nil
+	}
+}
+
+// ftpsData: TLS-adatkapcsolat, amely lezáráskor előbb jelzi az adatfolyam végét
+// (close_notify és TCP-félzárás), majd kiolvassa, amit a szerver még küldött.
+//
+// Enélkül TLS 1.3-nál a szerver által küldött, de el nem olvasott üzenetek miatt a
+// rendszer bontással (RST) zárná a kapcsolatot, és a szerver eldobhatná a feltöltött
+// fájl még fel nem dolgozott végét: hiányos vagy 0 bájtos fájl maradt a szerveren,
+// és a következő fájlnál a kapcsolat elakadhatott.
+type ftpsData struct {
+	*tls.Conn
+	once sync.Once
+	err  error
+}
+
+func (c *ftpsData) Close() error {
+	c.once.Do(func() {
+		if c.Conn.ConnectionState().HandshakeComplete {
+			c.Conn.SetDeadline(time.Now().Add(10 * time.Second))
+			if err := c.Conn.CloseWrite(); err == nil {
+				io.Copy(io.Discard, c.Conn)
+			}
+		}
+		c.err = c.Conn.Close()
+	})
+	return c.err
 }

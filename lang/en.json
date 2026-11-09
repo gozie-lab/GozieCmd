@@ -899,6 +899,7 @@
  "a program mappája nem írható: %s": "the program folder is not writable: %s",
  "a szerver gépkulcsa megváltozott, a kapcsolódás megszakítva": "the server's host key has changed, connection aborted",
  "a szerver gépkulcsát nem fogadtad el": "you did not accept the server's host key",
+ "a szerver nem válaszolt": "the server did not respond",
  "a szerveren nem érhető el az SFTP: %v": "SFTP is not available on the server: %v",
  "a szerverről": "from the server",
  "a(z) „%s” megosztás nem nyitható meg: %v": "the share “%s” cannot be opened: %v",

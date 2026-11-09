@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -404,5 +405,75 @@ func TestUploadSizeCheck(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "a.bin")); err == nil {
 		t.Fatal("a hiányos fájl ott maradt")
+	}
+}
+
+// stuckRaw: az első feltöltésnél elakad (a szerver nem válaszol), amíg a kapcsolatot
+// nem bontják; újracsatlakozás után már rendben megy.
+type stuckRaw struct {
+	halfRaw
+	mu     sync.Mutex
+	stuck  chan struct{}
+	stalls int
+}
+
+func (s *stuckRaw) put(p string, in io.Reader, size int64) error {
+	s.mu.Lock()
+	ch := s.stuck
+	s.mu.Unlock()
+	if ch != nil {
+		<-ch
+		return errors.New("connection lost")
+	}
+	b, _ := io.ReadAll(in)
+	return os.WriteFile(filepath.Join(s.root, p), b, 0o644)
+}
+func (s *stuckRaw) size(p string) (int64, error) { return s.halfRaw.size(p) }
+func (s *stuckRaw) list(string) ([]rawInfo, error) { return nil, nil }
+func (s *stuckRaw) remove(p string, _ bool) error { return os.Remove(filepath.Join(s.root, p)) }
+func (s *stuckRaw) chtimes(string, time.Time) error { return nil }
+func (s *stuckRaw) close() {
+	s.mu.Lock()
+	if s.stuck != nil {
+		close(s.stuck)
+		s.stuck = nil
+		s.stalls++
+	}
+	s.mu.Unlock()
+}
+func (s *stuckRaw) reconnect() error { return nil }
+
+// Az őr felismeri az elakadt átvitelt, bontja a kapcsolatot, és az újrapróbálás sikerül.
+func TestStallWatchdog(t *testing.T) {
+	old := stallLimit
+	stallLimit = 300 * time.Millisecond
+	defer func() { stallLimit = old }()
+	root, local := t.TempDir(), t.TempDir()
+	for _, n := range []string{"a.bin", "b.bin"} {
+		must(t, os.WriteFile(filepath.Join(local, n), make([]byte, 5000), 0o644))
+	}
+	r := &stuckRaw{halfRaw: halfRaw{root: root}, stuck: make(chan struct{})}
+	f := &genFS{raw: r, kind: "sftp"}
+	pr := &errCount{}
+	done := make(chan error, 1)
+	go func() {
+		done <- f.Upload([]string{filepath.Join(local, "a.bin"), filepath.Join(local, "b.bin")}, "/", pr)
+	}()
+	select {
+	case err := <-done:
+		must(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("az őr nem oldotta fel az elakadást")
+	}
+	r.mu.Lock()
+	stalls := r.stalls
+	r.mu.Unlock()
+	if pr.n != 0 || stalls != 1 {
+		t.Fatalf("hibák: %d, elakadások: %d", pr.n, stalls)
+	}
+	for _, n := range []string{"a.bin", "b.bin"} {
+		if st, err := os.Stat(filepath.Join(root, n)); err != nil || st.Size() != 5000 {
+			t.Fatal(n, err)
+		}
 	}
 }
