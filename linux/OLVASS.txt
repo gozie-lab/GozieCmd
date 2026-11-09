@@ -1,0 +1,39 @@
+Gozie Commander 0.46 – kétpaneles fájlkezelő Linuxra
+=====================================================
+
+Telepítés (rendszergazda jog nem kell):
+  1. Csomagold ki bárhová.
+  2. Futtasd a telepit.sh-t (Dolphinban/Nautilusban jobb gomb → Futtatás,
+     vagy terminálban: ./telepit.sh).
+  Ezután az alkalmazások között megtalálod, terminálból: goziecmd
+  Eltávolítás: eltavolit.sh
+
+Telepítés nélkül is indítható: dupla kattintás a goziecmd fájlon
+(vagy terminálban: ./goziecmd).
+
+Működik: Ubuntu 22.04 és újabb, Linux Mint 21+, Kubuntu, Fedora (Kinoite,
+Silverblue is), Bazzite – X11 és Wayland alatt egyaránt. Csak az asztali
+környezet szokásos grafikus könyvtárai kellenek, semmit nem kell telepíteni.
+A 7Z íráshoz (és CAB, ARJ, LZH olvasásához) a 7zip vagy p7zip csomag kell;
+Fedora Atomic rendszereken (Kinoite, Bazzite) ez rpm-ostree-vel vagy
+Distrobox-ban telepíthető – a ZIP, RAR, TAR, GZ, XZ enélkül is működik.
+
+Az összes billentyűparancs a programban: F1.
+A billentyűzet ugyanaz, mint a Windows-változatban (kétpaneles fájlkezelőknél megszokott);
+a törlés a rendszer Kukájába kerül (Dolphin, Nautilus is látja).
+
+Beállítások: ~/.config/GozieCommander/settings.ini
+Hordozható mód: ha a goziecmd mellett GozieCmd.ini van, a program azt használja.
+A beállításfájl a Windows-változattal cserélhető (Beállítások → Kezelés).
+
+Frissítés
+---------
+A program naponta egyszer, induláskor megnézi, van-e új verzió (Beállítások >
+Kezelés > Programfrissítés; kézzel: Súgó > Frissítés keresése). Jóváhagyás után
+letölti, ellenőrzi és lecseréli magát, majd újraindul. A beállítások megmaradnak.
+
+Licenc
+------
+Szabad szoftver a GNU GPL 3. vagy későbbi változata szerint (LICENSE.txt / LICENSE),
+mindenféle garancia nélkül. A felhasznált könyvtárak licencei:
+THIRD_PARTY_LICENSES.txt.

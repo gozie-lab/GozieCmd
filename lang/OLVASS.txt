@@ -1,0 +1,35 @@
+Gozie Commander – nyelvi fájlok / language files
+
+A program szövegei magyarul vannak a forrásban; minden más nyelv egy JSON-tábla:
+  {"_code": "en", "_name": "English", "Magyar szöveg": "Translated text", ...}
+
+Az angol (en.json) a programba van építve. Új nyelv:
+  1. Beállítások → Kezelés → „Fordítási sablon…”: elkészül a template.json
+     (bal oldalt a magyar eredeti, jobb oldalt az angol – ezt kell lefordítani).
+  2. Másold le pl. de.json néven, írd át a "_code" és "_name" mezőt, fordítsd le az értékeket.
+  3. Tedd a beállítások mappájának lang almappájába (vagy a program mellé, lang mappába),
+     majd válaszd ki a Beállításokban. A hiányzó szövegek angolul jelennek meg.
+A %d, %s stb. jeleket és a \n sortöréseket meg kell tartani, ugyanabban a sorrendben.
+A szöveg szórendje szabadon változtatható: a %s helyére kerülő rész (fájlnév, mappa, szám)
+a mondat bármely pontjára tehető.
+
+Többes szám: ahol a szöveg darabszámot tartalmaz (pl. "%d fájl"), a fordítás több alakot is
+megadhat „|” jellel elválasztva: "%d file|%d files". Az alakok sorrendjét a "_plural" mező adja:
+  one    – 1 | minden más                       (angol, német, olasz, spanyol, holland, svéd …)
+  fr     – 0 vagy 1 | minden más                (francia, brazil portugál)
+  slavic – 1, 21, 31… | 2–4, 22–24… | többi     (orosz, ukrán, szerb, horvát)
+  pl     – 1 | 2–4, 22–24… | többi               (lengyel)
+  cs     – 1 | 2–4 | többi                       (cseh, szlovák)
+  none   – egyetlen alak                         (magyar, török, japán, kínai …)
+
+Fejlesztőknek: tools/i18n – új szövegek becsomagolása T()-be és a hiányzó fordítások listája.
+
+---
+
+The program's texts are in Hungarian in the source; every other language is a JSON table.
+English (en.json) is built in. New language: Settings → Behavior → "Translation template…",
+copy template.json as e.g. de.json, set "_code" and "_name", translate the values, put it into
+the "lang" subfolder of the settings folder (or next to the program) and select it in Settings.
+Keep %d, %s etc. and \n line breaks, in the same order; word order around them is free.
+Plurals: separate the forms with "|" (e.g. "%d file|%d files"); set "_plural" to one, fr,
+slavic, pl, cs or none (see above). Missing entries fall back to English.

@@ -1,0 +1,40 @@
+name: build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Linux fejlécek / Linux headers
+        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev zip
+      - name: Tesztek / Tests
+        run: GOSUMDB=off GOFLAGS=-mod=mod go test ./...
+      - name: Verziószám ellenőrzése / Check version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          VER=$(sed -n 's/^const appVersion = "\(.*\)"/\1/p' version.go)
+          [ "${GITHUB_REF_NAME#v}" = "$VER" ] || { echo "A címke ($GITHUB_REF_NAME) és a version.go ($VER) eltér"; exit 1; }
+      - name: Csomagolás / Package
+        run: |
+          mkdir -p dist && ./package.sh "$PWD/dist"
+          cd dist && sha256sum GozieCmd-* > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GozieCmd
+          path: dist/*
+      - name: Kiadás / Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

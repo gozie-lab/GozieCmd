@@ -1,0 +1,51 @@
+Gozie Commander 0.46 – kétpaneles fájlkezelő Windowsra
+====================================================
+
+Nem kell telepíteni. Csomagold ki bárhová (akár pendrive-ra), és indítsd
+el a GozieCmd.exe fájlt. 64 bites Windows 10 vagy 11 kell hozzá.
+
+Ha a Windows „A Windows megvédte a számítógépet” üzenetet ír ki, az csak
+azért van, mert a program nincs digitálisan aláírva:
+  Továbbiak  ->  Futtatás mindenképp
+
+Az összes billentyűparancs a programban: F1.
+
+Legfontosabbak:
+  Tab            váltás a panelek között
+  Enter          mappa / fájl megnyitása     Backspace   szülőmappa
+  Insert, Szóköz jelölés (piros)             Num + / -   jelölés mintával
+  F3 nézőke  F4 szerkesztés  F5 másolás  F6 mozgatás  F7 új mappa  F8 törlés
+  Shift+F6 átnevezés   Ctrl+U panelcsere   Ctrl+H rejtett fájlok
+
+ZIP: Enter egy .zip fájlon belép az archívumba; F5 a másik panelre kicsomagol,
+     a másik panelről F5 hozzáad. Ctrl+P becsomagol, Ctrl+Shift+P kicsomagol.
+FTP: Ctrl+F kapcsolódás (FTPS is), F5 / F6 le- és feltöltés,
+     Ctrl+Shift+F vagy Backspace a gyökérben bontja a kapcsolatot.
+     A jelszót a program nem menti el.
+
+A beállítások (utolsó mappák, ablakméret, színek, eszköztár) helye:
+  %APPDATA%\GozieCommander\GozieCommander\settings.ini
+(a 0.14-es beállítások megmaradnak).
+
+Hordozható mód: ha a GozieCmd.exe mellett GozieCmd.ini fájl van, a program
+azt használja. Bekapcsolható a Beállítások -> Kezelés lapon is, ahol a
+beállítások fájlba menthetők és fájlból betölthetők (másik gépre vihetők).
+
+Újdonságok: sötét / világos / automatikus téma (Beállítások -> Megjelenés),
+állítható eszköztár-ikonméret, eszköztár ki-be kapcsolása (Nézet menü), klasszikus
+kijelölés jobb egérgombbal (1 mp nyomva tartás után helyi menü).
+
+Linux-változat: GozieCmd-<verzió>-linux-x86_64.tar.gz (ugyanaz a billentyűzet,
+a beállításfájl a két rendszer között cserélhető).
+
+Frissítés
+---------
+A program naponta egyszer, induláskor megnézi, van-e új verzió (Beállítások >
+Kezelés > Programfrissítés; kézzel: Súgó > Frissítés keresése). Jóváhagyás után
+letölti, ellenőrzi és lecseréli magát, majd újraindul. A beállítások megmaradnak.
+
+Licenc
+------
+Szabad szoftver a GNU GPL 3. vagy későbbi változata szerint (LICENSE.txt / LICENSE),
+mindenféle garancia nélkül. A felhasznált könyvtárak licencei:
+THIRD_PARTY_LICENSES.txt.

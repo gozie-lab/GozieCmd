@@ -1,0 +1,7 @@
+# fordítási eredmények / build output
+/GozieCmd.exe
+/goziecmd
+*.zip
+*.tar.gz
+# helyi Linux fordítókörnyezet / local Linux SDK
+/linux-sdk/
