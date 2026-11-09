@@ -43,7 +43,7 @@ Requires Go 1.24; the Linux build needs OpenGL/X11 headers.
 go test ./...
 ```
 
-Új kiadás / new release: `git tag v0.46 && git push --tags` — a GitHub Actions lefordítja
+Új kiadás / new release: `git tag v0.47 && git push --tags` — a GitHub Actions lefordítja
 és feltölti a csomagokat. GitHub Actions builds and uploads the packages.
 
 ## Licenc / License

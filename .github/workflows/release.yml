@@ -12,8 +12,8 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: '1.24'
       - name: Linux fejlécek / Linux headers
@@ -27,7 +27,7 @@ jobs:
           [ "${GITHUB_REF_NAME#v}" = "$VER" ] || { echo "A címke ($GITHUB_REF_NAME) és a version.go ($VER) eltér"; exit 1; }
       - name: Csomagolás / Package
         run: |
-          mkdir -p dist && ./package.sh "$PWD/dist"
+          mkdir -p dist && sh ./package.sh "$PWD/dist"
           cd dist && sha256sum GozieCmd-* > SHA256SUMS.txt && cat SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
