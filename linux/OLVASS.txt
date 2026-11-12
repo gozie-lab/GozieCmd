@@ -1,4 +1,4 @@
-Gozie Commander 0.57 – kétpaneles fájlkezelő Linuxra
+Gozie Commander 0.58 – kétpaneles fájlkezelő Linuxra
 =====================================================
 
 Telepítés (rendszergazda jog nem kell):

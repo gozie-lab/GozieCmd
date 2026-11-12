@@ -64,6 +64,7 @@
     <control>pointing</control>
   </supports>
   <releases>
+    <release version="0.58" date="2026-11-12"/>
     <release version="0.57" date="2026-11-12">
       <description>
         <p>Own signed Flatpak repository with updates through the software center; contact

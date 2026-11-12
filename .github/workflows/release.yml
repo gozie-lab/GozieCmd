@@ -80,24 +80,24 @@ jobs:
           FLATPAK_GPG_KEY: ${{ secrets.FLATPAK_GPG_KEY }}
         run: |
           [ -n "$FLATPAK_GPG_KEY" ] || { echo "Hiányzik a FLATPAK_GPG_KEY titok (Settings › Secrets and variables › Actions)"; exit 1; }
-          mkdir -m 700 "$PWD/gpg"
-          printf '%s\n' "$FLATPAK_GPG_KEY" | gpg --homedir "$PWD/gpg" --batch --import
-          echo "GPG_ID=$(gpg --homedir "$PWD/gpg" --list-secret-keys --with-colons | awk -F: '/^fpr/{print $10; exit}')" >> "$GITHUB_ENV"
+          mkdir -m 700 "$RUNNER_TEMP/gpg"
+          printf '%s\n' "$FLATPAK_GPG_KEY" | gpg --homedir "$RUNNER_TEMP/gpg" --batch --import
+          echo "GPG_ID=$(gpg --homedir "$RUNNER_TEMP/gpg" --list-secret-keys --with-colons | awk -F: '/^fpr/{print $10; exit}')" >> "$GITHUB_ENV"
       - name: Fordítás és tároló / Build and repository
         run: |
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
           mkdir -p site
           flatpak-builder --user --install-deps-from=flathub --disable-rofiles-fuse --default-branch=stable \
-            --repo=site/repo --gpg-sign="$GPG_ID" --gpg-homedir="$PWD/gpg" --force-clean \
+            --repo=site/repo --gpg-sign="$GPG_ID" --gpg-homedir="$RUNNER_TEMP/gpg" --force-clean \
             build flatpak/hu.gozie.commander.yml
           flatpak build-update-repo --generate-static-deltas --prune --default-branch=stable \
-            --title="Gozie Commander" --gpg-sign="$GPG_ID" --gpg-homedir="$PWD/gpg" site/repo
+            --title="Gozie Commander" --gpg-sign="$GPG_ID" --gpg-homedir="$RUNNER_TEMP/gpg" site/repo
           flatpak build-bundle --repo-url="$REPO_URL/repo/" \
             --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
-            --gpg-keys=flatpak/gozie-flatpak.gpg --gpg-sign="$GPG_ID" --gpg-homedir="$PWD/gpg" \
+            --gpg-keys=flatpak/gozie-flatpak.gpg --gpg-sign="$GPG_ID" --gpg-homedir="$RUNNER_TEMP/gpg" \
             site/repo "GozieCmd-$VER-x86_64.flatpak" hu.gozie.commander stable
           sh flatpak/tarolo.sh site "$REPO_URL" "$VER"
-          rm -rf "$PWD/gpg"
+          rm -rf "$RUNNER_TEMP/gpg"
           ls -la site "GozieCmd-$VER-x86_64.flatpak"
       - name: Kiadás / Release
         if: startsWith(github.ref, 'refs/tags/')

@@ -3,6 +3,13 @@
 A kiadások leírása innen készül: a GitHub Actions a verzióhoz tartozó szakaszt
 teszi a kiadás oldalára. Új kiadás előtt ide kerül egy új `## X.YY` szakasz.
 
+## 0.58
+
+- A Flatpak-tároló és a `.flatpak` fájl elkészítése javítva: a 0.57-ben leírt
+  Flatpak-tároló ettől a kiadástól érhető el.
+  *Fixed building the Flatpak repository and the `.flatpak` file: the Flatpak
+  repository described in 0.57 is available from this release on.*
+
 ## 0.57
 
 ### Flatpak-tároló / Flatpak repository

@@ -76,5 +76,7 @@ modules:
           - repo
           - .flatpak-builder
           - linux-sdk
+          - site
+          - gpg
           - GozieCmd.exe
           - goziecmd
