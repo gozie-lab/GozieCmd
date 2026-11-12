@@ -114,7 +114,7 @@ func (s *iniSettings) saveTo(p string) error {
 }
 
 func configDir() string {
-	if d, err := os.UserConfigDir(); err == nil {
+	if d, err := userConfigDir(); err == nil {
 		return filepath.Join(d, appDir)
 	}
 	home, _ := os.UserHomeDir()

@@ -196,9 +196,6 @@ func (a *App) settingsDialogAt(page int) {
 	updChk.SetChecked(a.updateCheckOn())
 	var updCard fyne.CanvasObject = widget.NewCard("", T("Programfrissítés"), container.NewHBox(updChk, layout.NewSpacer(),
 		widget.NewButton(T("Keresés most"), func() { a.checkUpdate(true) })))
-	if !updatesAllowed() {
-		updCard = widget.NewCard("", T("Programfrissítés"), widget.NewLabel(T("A Flatpak-változatot a Flatpak frissíti.")))
-	}
 	portable := widget.NewCheck(T("Hordozható mód: a beállítások a program mellett, a GozieCmd.ini fájlban"), nil)
 	portable.SetChecked(a.portable)
 	fileLbl := widget.NewLabel(a.settings.FilePath())
@@ -267,7 +264,7 @@ func (a *App) settingsDialogAt(page int) {
 	}
 	sevenE := widget.NewEntry()
 	sevenE.SetText(a.setting("lx.sevenZip", ""))
-	sevenE.SetPlaceHolder(fmt.Sprintf(T("%s  (automatikus)"), findExe("7zz", "7z", "7za")))
+	sevenE.SetPlaceHolder(fmt.Sprintf(T("%s  (automatikus)"), findLocalExe("7zz", "7z", "7za")))
 	progTab := container.NewVBox(
 		widget.NewCard("", T("Szövegszerkesztő (F4)"), container.New(layout.NewFormLayout(),
 			widget.NewLabel(T("Program:")), edSel, widget.NewLabel(T("Parancs:")), edEntry)),

@@ -20,16 +20,7 @@ var (
 	appIconCache = map[string]fyne.Resource{}
 )
 
-func xdgDataDirs() []string {
-	home, _ := os.UserHomeDir()
-	dirs := []string{filepath.Join(home, ".local/share"), filepath.Join(home, ".local/share/flatpak/exports/share"), "/var/lib/flatpak/exports/share"}
-	sys := os.Getenv("XDG_DATA_DIRS")
-	if sys == "" {
-		sys = "/usr/local/share:/usr/share"
-	}
-	dirs = append(dirs, filepath.SplitList(sys)...)
-	return dirs
-}
+func xdgDataDirs() []string { return hostDataDirs() }
 
 // desktopIconName: a programhoz tartozó .desktop fájl Icon= értéke.
 func desktopIconName(exe string) string {

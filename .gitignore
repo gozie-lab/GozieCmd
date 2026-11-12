@@ -5,3 +5,8 @@
 *.tar.gz
 # helyi Linux fordítókörnyezet / local Linux SDK
 /linux-sdk/
+/vendor/
+/build/
+/repo/
+/.flatpak-builder/
+*.flatpak

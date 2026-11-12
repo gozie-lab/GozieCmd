@@ -775,6 +775,13 @@ func (w *window) create() {
 		glfw.WindowHint(glfw.Resizable, glfw.True)
 	}
 	glfw.WindowHint(glfw.AutoIconify, glfw.False)
+	// Gozie: állandó WM_CLASS az alkalmazás azonosítójával (alapból az ablak címe
+	// lenne, ami a verziószámmal változik); így a .desktop fájl és a tálca ikonja
+	// megtalálja az ablakot, Flatpakban is.
+	if id := fyne.CurrentApp().UniqueID(); id != "" && !strings.HasPrefix(id, "missing-id") {
+		glfw.WindowHintString(glfw.X11ClassName, id)
+		glfw.WindowHintString(glfw.X11InstanceName, id)
+	}
 	initWindowHints()
 
 	pixWidth, pixHeight := w.screenSize(w.canvas.size)

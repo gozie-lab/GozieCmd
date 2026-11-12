@@ -3,6 +3,19 @@
 A kiadások leírása innen készül: a GitHub Actions a verzióhoz tartozó szakaszt
 teszi a kiadás oldalára. Új kiadás előtt ide kerül egy új `## X.YY` szakasz.
 
+## 0.52
+
+- Flatpak-csomag: `GozieCmd-0.52-x86_64.flatpak`. Megnyitva a Szoftverközpont vagy a
+  Discover telepíti, vagy terminálban: `flatpak install --user GozieCmd-0.52-x86_64.flatpak`.
+  A 7-Zip benne van; a szerkesztő, a terminál, az eszköztár programjai és a fájlok
+  megnyitása a rendszer saját programjaival működik; a beállítások közösek a
+  kicsomagolt változattal.
+  *Flatpak package. 7-Zip is included; editors, terminals, toolbar programs and file
+  opening use the system's own programs; settings are shared with the extracted version.*
+- Linux: az ablak azonosítója (WM_CLASS) állandó, így a tálca és a menü ikonja
+  verzióváltás után is egyezik.
+  *Linux: fixed window class, so the taskbar icon matches the menu entry.*
+
 ## 0.51
 
 - Titkosított FTP (FTPS): a feltöltés nem akad el többé a második fájlnál, és

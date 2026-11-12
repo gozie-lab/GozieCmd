@@ -424,8 +424,8 @@ func trashPath(p string) error {
 	if sameDevice(abs, filepath.Dir(home)) {
 		return moveToTrash(home, abs, abs)
 	}
-	if gio, err := exec.LookPath("gio"); err == nil {
-		if out, err := exec.Command(gio, "trash", "--", abs).CombinedOutput(); err == nil {
+	if gio, err := hostLookPath("gio"); err == nil { // Flatpakban a gazdarendszer gio-ja (a saját Kukájával)
+		if out, err := hostify(exec.Command(gio, "trash", "--", abs)).CombinedOutput(); err == nil {
 			return nil
 		} else {
 			dlog("gio trash: %v %s", err, out)
@@ -445,6 +445,9 @@ func trashPath(p string) error {
 
 func homeTrashDir() string {
 	data := os.Getenv("XDG_DATA_HOME")
+	if inFlatpak { // a sandbox XDG_DATA_HOME-ja a saját mappája; a valódi Kuka a gazdarendszeré
+		data = os.Getenv("HOST_XDG_DATA_HOME")
+	}
 	if data == "" {
 		home, _ := os.UserHomeDir()
 		data = filepath.Join(home, ".local", "share")

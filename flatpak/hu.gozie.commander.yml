@@ -1,0 +1,80 @@
+# Gozie Commander – Flatpak-csomag
+#
+# Fordítás (a tároló gyökeréből; a Go-modulokat előbb be kell másolni a vendor mappába,
+# mert a Flatpak a fordítás közben nem enged hálózatot):
+#   go mod vendor
+#   flatpak-builder --user --install --force-clean build flatpak/hu.gozie.commander.yml
+#   flatpak run hu.gozie.commander
+#
+# Egyetlen telepíthető fájl:
+#   flatpak-builder --repo=repo --force-clean build flatpak/hu.gozie.commander.yml
+#   flatpak build-bundle repo GozieCmd.flatpak hu.gozie.commander
+#
+# A GitHub Actions minden kiadásnál elkészíti (GozieCmd-X.YY-x86_64.flatpak).
+
+id: hu.gozie.commander
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.golang
+command: goziecmd
+
+finish-args:
+  # felület (a Fyne X11-en rajzol; Waylandon XWaylanddel fut)
+  - --socket=x11
+  - --share=ipc
+  # OpenGL és a cserélhető eszközök felismerése (/dev/disk/by-uuid)
+  - --device=all
+  # FTP, SFTP, WebDAV, SMB, frissítéskeresés
+  - --share=network
+  # fájlkezelő: a teljes fájlrendszer, a csatolt meghajtókkal együtt
+  - --filesystem=host
+  # a gazdarendszer programjainak ikonjai és .desktop fájljai (eszköztár)
+  - --filesystem=host-os:ro
+  # a rendszer által csatolt hálózati megosztások (GVfs)
+  - --filesystem=xdg-run/gvfs
+  # külső programok indítása a gazdarendszeren: szerkesztő, terminál, eszköztár
+  # programjai, fájlmegnyitás (xdg-open), pendrive csatolása (udisksctl), Kuka (gio)
+  - --talk-name=org.freedesktop.Flatpak
+
+modules:
+  # 7-Zip (7zz): a 7Z-archívumok írásához és a CAB/ARJ/LZH olvasásához
+  - name: 7zip
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 7zz /app/bin/7zz
+      - install -Dm644 License.txt /app/share/licenses/7zip/License.txt
+    sources:
+      - type: archive
+        url: https://github.com/ip7z/7zip/releases/download/25.01/7z2501-linux-x64.tar.xz
+        sha256: 4ca3b7c6f2f67866b92622818b58233dc70367be2f36b498eb0bdeaaa44b53f4
+        strip-components: 0
+
+  - name: goziecmd
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/golang/bin
+      env:
+        CGO_ENABLED: '1'
+        GOFLAGS: -mod=vendor
+        GOTOOLCHAIN: local
+        GOCACHE: /run/build/goziecmd/.gocache
+        GOPATH: /run/build/goziecmd/.gopath
+    build-commands:
+      - go build -trimpath -ldflags "-s -w" -o /app/bin/goziecmd .
+      - install -Dm644 flatpak/hu.gozie.commander.desktop /app/share/applications/hu.gozie.commander.desktop
+      - install -Dm644 flatpak/hu.gozie.commander.metainfo.xml /app/share/metainfo/hu.gozie.commander.metainfo.xml
+      - install -Dm644 goziecmd.png /app/share/icons/hicolor/256x256/apps/hu.gozie.commander.png
+      - install -Dm644 LICENSE /app/share/licenses/goziecmd/LICENSE
+      - install -Dm644 THIRD_PARTY_LICENSES.txt /app/share/licenses/goziecmd/THIRD_PARTY_LICENSES.txt
+    sources:
+      - type: dir
+        path: ..
+        skip:
+          - build
+          - repo
+          - .flatpak-builder
+          - linux-sdk
+          - GozieCmd.exe
+          - goziecmd

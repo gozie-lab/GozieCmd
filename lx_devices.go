@@ -123,9 +123,9 @@ var mountedAt = regexp.MustCompile(` at (.+?)\.?$`)
 
 // mountDevice a rendszerrel (udisks) csatolja az eszközt, és visszaadja a csatolási pontot.
 func mountDevice(dev string) (string, error) {
-	out, err := exec.Command("udisksctl", "mount", "-b", dev).CombinedOutput()
+	out, err := hostify(exec.Command("udisksctl", "mount", "-b", dev)).CombinedOutput()
 	if err != nil {
-		if _, e := exec.LookPath("udisksctl"); e != nil {
+		if _, e := hostLookPath("udisksctl"); e != nil {
 			return "", errors.New(T("a csatoláshoz a udisksctl program kell (udisks2 csomag)"))
 		}
 		return "", fmt.Errorf("%s", strings.TrimSpace(string(out)))

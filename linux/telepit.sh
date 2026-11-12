@@ -19,7 +19,7 @@ Icon=goziecmd
 Terminal=false
 Categories=System;FileManager;Utility;
 Keywords=fájl;fájlkezelő;commander;file;manager;
-StartupWMClass=@TITLE@
+StartupWMClass=hu.gozie.commander
 DESK
 command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APPS" >/dev/null 2>&1 || true
 echo "Kész. A Gozie Commander megtalálható az alkalmazások között, vagy indítsd így: goziecmd"

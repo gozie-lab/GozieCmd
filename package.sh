@@ -12,7 +12,7 @@ mv /tmp/gzpkg/win/GozieCmd/THIRD_PARTY_LICENSES.txt.txt /tmp/gzpkg/win/GozieCmd/
 sed "s/^Gozie Commander [0-9.]* /Gozie Commander $VER /; s/\$/\r/" OLVASS.txt > /tmp/gzpkg/win/GozieCmd/OLVASS.txt
 (cd /tmp/gzpkg/win && rm -f "$OUT/GozieCmd-$VER-windows.zip" && zip -qr "$(cd "$OLDPWD" && cd "$OUT" && pwd)/GozieCmd-$VER-windows.zip" GozieCmd)
 cp goziecmd goziecmd.png linux/eltavolit.sh LICENSE THIRD_PARTY_LICENSES.txt /tmp/gzpkg/lx/GozieCmd/
-sed "s/@TITLE@/Gozie Commander $VER/" linux/telepit.sh > /tmp/gzpkg/lx/GozieCmd/telepit.sh
+cp linux/telepit.sh /tmp/gzpkg/lx/GozieCmd/telepit.sh
 chmod +x /tmp/gzpkg/lx/GozieCmd/telepit.sh /tmp/gzpkg/lx/GozieCmd/eltavolit.sh /tmp/gzpkg/lx/GozieCmd/goziecmd
 sed "s/^Gozie Commander [0-9.]* /Gozie Commander $VER /" linux/OLVASS.txt > /tmp/gzpkg/lx/GozieCmd/OLVASS.txt
 tar -C /tmp/gzpkg/lx -czf "$OUT/GozieCmd-$VER-linux-x86_64.tar.gz" GozieCmd

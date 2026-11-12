@@ -25,10 +25,6 @@ func (a *App) startUpdateCheck() {
 }
 
 func (a *App) checkUpdate(manual bool) {
-	if !updatesAllowed() {
-		dialog.ShowInformation(T("Programfrissítés"), T("A Flatpak-változatot a Flatpak frissíti (pl. a Szoftverközpont vagy a „flatpak update” parancs)."), a.win)
-		return
-	}
 	go func() {
 		r, err := latestRelease()
 		fyne.Do(func() {
@@ -44,6 +40,8 @@ func (a *App) checkUpdate(manual bool) {
 				if manual {
 					dialog.ShowInformation(T("Programfrissítés"), fmt.Sprintf(T("A legújabb verziót használod (%s)."), appVersion), a.win)
 				}
+			case !updatesAllowed():
+				a.offerFlatpakUpdate(r)
 			default:
 				a.offerUpdate(r)
 			}
@@ -96,4 +94,16 @@ func (a *App) offerUpdate(r *release) {
 				a.offerUpdate(r) // utána újra kérdez
 			}
 		})
+}
+
+// offerFlatpakUpdate: a Flatpak-csomag nem cserélheti le magát; az új .flatpak fájlt a
+// felhasználó tölti le és nyitja meg (a Szoftverközpont vagy a flatpak install telepíti).
+func (a *App) offerFlatpakUpdate(r *release) {
+	msg := fmt.Sprintf(T("Elérhető az új verzió: %s (most: %s).\n\nA Flatpak-változathoz töltsd le a GozieCmd-%s-x86_64.flatpak fájlt a letöltési oldalról, és nyisd meg (a Szoftverközpont telepíti), vagy terminálban:\nflatpak install --user GozieCmd-%s-x86_64.flatpak"),
+		r.version(), appVersion, r.version(), r.version())
+	a.choice(T("Programfrissítés"), msg, []string{T("Letöltési oldal"), T("Később")}, 0, func(i int) {
+		if i == 0 {
+			a.openFile(r.notesURL())
+		}
+	})
 }

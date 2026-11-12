@@ -104,6 +104,7 @@ A legújabb változat mindig a **[Releases](https://github.com/gozie-lab/GozieCm
 |---|---|
 | **Windows 10 / 11** | Töltsd le a `GozieCmd-…-windows.zip` fájlt, csomagold ki egy mappába, és indítsd a **`GozieCmd.exe`**-t. Telepíteni nem kell. |
 | **Linux (x86_64)** | Töltsd le a `GozieCmd-…-linux-x86_64.tar.gz` fájlt, bontsd ki, és futtasd a **`telepit.sh`**-t: a program bekerül az alkalmazások menüjébe. Eltávolítás: `eltavolit.sh`. |
+| **Linux – Flatpak** | Töltsd le a `GozieCmd-…-x86_64.flatpak` fájlt, és nyisd meg (a Szoftverközpont / Discover telepíti), vagy terminálban: `flatpak install --user GozieCmd-…-x86_64.flatpak`. A 7-Zip benne van, a beállítások közösek a kicsomagolt változattal. |
 
 **Frissítés:** a program naponta egyszer magától megnézi, van-e új verzió, és jóváhagyás után
 letölti, ellenőrzi és lecseréli magát (kézzel: *Súgó › Frissítés keresése…*). A beállítások megmaradnak.
@@ -158,6 +159,7 @@ Get the latest version from **[Releases](https://github.com/gozie-lab/GozieCmd/r
 
 - **Windows 10 / 11:** download `GozieCmd-…-windows.zip`, extract it and run **`GozieCmd.exe`** – no installation needed.
 - **Linux (x86_64):** download `GozieCmd-…-linux-x86_64.tar.gz`, extract it and run **`telepit.sh`** to add it to your application menu (`eltavolit.sh` removes it).
+- **Linux – Flatpak:** download `GozieCmd-…-x86_64.flatpak` and open it (GNOME Software / Discover installs it), or run `flatpak install --user GozieCmd-…-x86_64.flatpak`. 7-Zip is included; settings are shared with the extracted version.
 
 **Updates:** once a day the program checks for a new version and, after you confirm, downloads, verifies
 and replaces itself (manually: *Help › Check for updates…*). Your settings are kept.
@@ -180,7 +182,7 @@ sh package.sh    # kiadási csomagok / release packages
 go test ./...
 ```
 
-Új kiadás / new release: `git tag v0.51 && git push --tags` – a GitHub Actions lefordítja és feltölti
+Új kiadás / new release: `git tag v0.52 && git push --tags` – a GitHub Actions lefordítja és feltölti
 a csomagokat (a címkének egyeznie kell a `version.go` verziószámával).
 
 A kiadás neve „Gozie Commander X.YY”, a leírása a `VALTOZASOK.md` megfelelő szakaszából készül – új kiadás előtt oda kell írni az újdonságokat. / The release is named “Gozie Commander X.YY”; its notes come from the matching section of `VALTOZASOK.md`.
@@ -199,3 +201,14 @@ licenses: [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).
 
 A Gozie Commander független projekt, más fájlkezelőkhöz nincs köze.
 Gozie Commander is an independent project, not affiliated with any other file manager.
+
+### Flatpak
+
+A `flatpak/hu.gozie.commander.yml` leírás alapján a GitHub Actions minden kiadásnál elkészíti a
+`.flatpak` csomagot. Helyben / locally:
+
+```sh
+go mod vendor
+flatpak-builder --user --install --force-clean build flatpak/hu.gozie.commander.yml
+flatpak run hu.gozie.commander
+```

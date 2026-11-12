@@ -256,7 +256,7 @@ func (a *App) runButton(b tbButton) {
 	line := shellQuote(b.Exe) + " " + a.expandParams(b.Params)
 	c := exec.Command("sh", "-c", line)
 	c.Dir = dir
-	if err := startDetached(c); err != nil {
+	if err := startDetached(hostify(c)); err != nil {
 		a.warn(fmt.Sprintf(T("A program nem indítható:\n%s"), errText(err)))
 	}
 }
@@ -460,7 +460,7 @@ func (a *App) editButtons(kind string) {
 			}
 		}, w)
 		d.SetFilter(storage.NewExtensionFileFilter([]string{".png", ".svg", ".PNG", ".SVG"}))
-		if l, err := storage.ListerForURI(storage.NewFileURI("/usr/share/icons/hicolor")); err == nil {
+		if l, err := storage.ListerForURI(storage.NewFileURI(hostPath("/usr/share/icons/hicolor"))); err == nil {
 			d.SetLocation(l)
 		}
 		d.Resize(fyne.NewSize(700, 500))

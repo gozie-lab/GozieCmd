@@ -48,6 +48,20 @@ func T(s string) string {
 	return s
 }
 
+// userConfigDir: a felhasználó beállításmappája. Flatpakban is a gazdarendszer
+// ~/.config-ja (nem a ~/.var/app/… alatti saját mappa), így a Flatpak és a
+// kicsomagolt változat ugyanazokat a beállításokat használja.
+func userConfigDir() (string, error) {
+	if os.Getenv("FLATPAK_ID") != "" {
+		if d := os.Getenv("HOST_XDG_CONFIG_HOME"); d != "" {
+			return d, nil
+		}
+		home, err := os.UserHomeDir()
+		return filepath.Join(home, ".config"), err
+	}
+	return os.UserConfigDir()
+}
+
 // earlyConfigDirs: ahol a beállítások lehetnek (hordozható mód: a program mellett).
 func earlyConfigDirs() (portable string, normal string) {
 	if exe, err := os.Executable(); err == nil {
@@ -55,7 +69,7 @@ func earlyConfigDirs() (portable string, normal string) {
 	}
 	if runtime.GOOS == "windows" {
 		normal = filepath.Join(os.Getenv("APPDATA"), appDir, appDir)
-	} else if d, err := os.UserConfigDir(); err == nil {
+	} else if d, err := userConfigDir(); err == nil {
 		normal = filepath.Join(d, appDir)
 	}
 	return

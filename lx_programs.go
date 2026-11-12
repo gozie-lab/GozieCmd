@@ -20,7 +20,18 @@ type progChoice struct {
 	label, path string
 }
 
+// findExe: a gazdarendszer programja (Flatpakban is a gazdarendszeré).
 func findExe(names ...string) string {
+	for _, n := range names {
+		if p, err := hostLookPath(n); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
+// findLocalExe: a program saját környezetében futó segédprogram (Flatpakban a csomagban lévő).
+func findLocalExe(names ...string) string {
 	for _, n := range names {
 		if p, err := exec.LookPath(n); err == nil {
 			return p
@@ -115,7 +126,7 @@ func (a *App) openFile(path string) {
 			// futtatható program: elindítjuk
 			c := exec.Command(path)
 			c.Dir = dir
-			if err := startDetached(c); err == nil {
+			if err := startDetached(hostify(c)); err == nil {
 				return
 			}
 		}
@@ -133,7 +144,7 @@ func (a *App) openFile(path string) {
 	if st, err := os.Stat(dir); err == nil && st.IsDir() { // webcímnél nincs munkamappa
 		c.Dir = dir
 	}
-	if err := startDetached(c); err != nil {
+	if err := startDetached(hostify(c)); err != nil {
 		a.warn(fmt.Sprintf(T("A fájl nem nyitható meg:\n%s"), errText(err)))
 	}
 }
@@ -153,7 +164,7 @@ func (a *App) openInEditor(path string) {
 		return
 	}
 	args := strings.Fields(ed)
-	if _, err := exec.LookPath(args[0]); err != nil && !filepath.IsAbs(args[0]) {
+	if _, err := hostLookPath(args[0]); err != nil && !filepath.IsAbs(args[0]) {
 		a.warn(fmt.Sprintf(T("A beállított szerkesztő nem található:\n%s"), ed))
 		return
 	}
@@ -165,7 +176,7 @@ func (a *App) openInEditor(path string) {
 	}
 	c := exec.Command(args[0], append(args[1:], path)...)
 	c.Dir = filepath.Dir(path)
-	if err := startDetached(c); err != nil {
+	if err := startDetached(hostify(c)); err != nil {
 		a.warn(fmt.Sprintf(T("A szerkesztő nem indítható:\n%s"), errText(err)))
 	}
 }
@@ -304,7 +315,7 @@ func (a *App) openTerminalAt(dir string) {
 	}
 	c := exec.Command(t, termArgs(t, dir, "")...)
 	c.Dir = dir
-	if err := startDetached(c); err != nil {
+	if err := startDetached(hostify(c)); err != nil {
 		a.warn(fmt.Sprintf(T("A terminál nem indítható:\n%s"), errText(err)))
 	}
 }
@@ -317,7 +328,7 @@ func (a *App) runInTerminal(cmdline, dir string) {
 	}
 	c := exec.Command(t, termArgs(t, dir, cmdline)...)
 	c.Dir = dir
-	if err := startDetached(c); err != nil {
+	if err := startDetached(hostify(c)); err != nil {
 		a.warn(fmt.Sprintf(T("A terminál nem indítható:\n%s"), errText(err)))
 	}
 }
@@ -377,9 +388,11 @@ func errnoText(e syscall.Errno) string {
 func init() {
 	sevenZipExe = func() string {
 		if v := theAppSetting("sevenZip"); v != "" {
-			return v
+			if _, err := os.Stat(v); err == nil || !inFlatpak {
+				return v
+			}
 		}
-		return findExe("7zz", "7z", "7za")
+		return findLocalExe("7zz", "7z", "7za")
 	}
 	run7z = func(exe, dir string, args ...string) (string, error) {
 		c := exec.Command(exe, args...)

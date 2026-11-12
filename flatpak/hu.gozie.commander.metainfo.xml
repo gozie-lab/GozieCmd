@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright Gozie -->
+<component type="desktop-application">
+  <id>hu.gozie.commander</id>
+  <name>Gozie Commander</name>
+  <summary>Two-panel file manager</summary>
+  <summary xml:lang="hu">Kétpaneles fájlkezelő</summary>
+  <developer id="hu.gozie">
+    <name>Gozie</name>
+  </developer>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <launchable type="desktop-id">hu.gozie.commander.desktop</launchable>
+  <description>
+    <p>
+      A two-panel file manager for Windows and Linux. Two folders side by side, one key
+      per action, and everything daily file work needs.
+    </p>
+    <p xml:lang="hu">
+      Kétpaneles fájlkezelő Windowsra és Linuxra. Két mappa egymás mellett, minden
+      művelet egy billentyűre, és benne van, ami a mindennapi munkához kell.
+    </p>
+    <ul>
+      <li>Copy, move and delete in the background, queued</li>
+      <li xml:lang="hu">Másolás, mozgatás, törlés a háttérben, sorba állítva</li>
+      <li>ZIP, 7Z, RAR and TAR archives open like folders; password-protected ZIP and 7Z</li>
+      <li xml:lang="hu">A ZIP, 7Z, RAR és TAR archívumok úgy nyílnak meg, mint egy mappa; jelszavas ZIP és 7Z</li>
+      <li>FTP, FTPS, SFTP, WebDAV and SMB connections</li>
+      <li xml:lang="hu">FTP-, FTPS-, SFTP-, WebDAV- és SMB-kapcsolatok</li>
+      <li>Multi-rename with live preview, folder compare and sync, file search</li>
+      <li xml:lang="hu">Többfájl-átnevező élő előnézettel, mappák összehasonlítása és szinkronizálása, keresés</li>
+      <li>Light and dark theme, Hungarian and English interface</li>
+      <li xml:lang="hu">Világos és sötét téma, magyar és angol felület</li>
+    </ul>
+  </description>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Main window, dark theme</caption>
+      <image>https://raw.githubusercontent.com/gozie-lab/GozieCmd/main/docs/kepek/foablak-sotet.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Main window, light theme</caption>
+      <image>https://raw.githubusercontent.com/gozie-lab/GozieCmd/main/docs/kepek/foablak-vilagos.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Packing with a password</caption>
+      <image>https://raw.githubusercontent.com/gozie-lab/GozieCmd/main/docs/kepek/becsomagolas.png</image>
+    </screenshot>
+  </screenshots>
+  <url type="homepage">https://cmd.gozie.hu/</url>
+  <url type="bugtracker">https://github.com/gozie-lab/GozieCmd/issues</url>
+  <url type="vcs-browser">https://github.com/gozie-lab/GozieCmd</url>
+  <categories>
+    <category>System</category>
+    <category>FileManager</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <branding>
+    <color type="primary" scheme_preference="light">#9cc7f0</color>
+    <color type="primary" scheme_preference="dark">#143c78</color>
+  </branding>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <releases>
+    <release version="0.52" date="2026-11-10">
+      <description>
+        <p>First Flatpak release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

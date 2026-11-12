@@ -35,7 +35,7 @@ jobs:
           echo "VER=$VER" >> "$GITHUB_ENV"
           awk -v v="## $VER" '$0==v{on=1;next} /^## /{on=0} on' VALTOZASOK.md > notes.md
           [ -s notes.md ] || echo "Gozie Commander $VER" > notes.md
-          printf '\n**Letöltés / Download:** Windows: `GozieCmd-%s-windows.zip`, Linux: `GozieCmd-%s-linux-x86_64.tar.gz`\n' "$VER" "$VER" >> notes.md
+          printf '\n**Letöltés / Download:** Windows: `GozieCmd-%s-windows.zip`, Linux: `GozieCmd-%s-linux-x86_64.tar.gz` vagy Flatpak / or Flatpak: `GozieCmd-%s-x86_64.flatpak`\n' "$VER" "$VER" "$VER" >> notes.md
           cat notes.md
       - uses: actions/upload-artifact@v4
         with:
@@ -48,3 +48,36 @@ jobs:
           name: Gozie Commander ${{ env.VER }}
           body_path: notes.md
           files: dist/*
+
+  # Flatpak-csomag (GozieCmd-X.YY-x86_64.flatpak) – a fenti kiadáshoz csatolva.
+  # Ha ez a lépés nem sikerül, a többi letöltés attól még kikerül.
+  flatpak:
+    needs: build
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.24'
+          cache: false
+      - name: Go-modulok a csomagba / Vendor Go modules
+        run: GOSUMDB=off GOFLAGS=-mod=mod go mod vendor
+      - name: Verzió a leírásba / Version into metainfo
+        run: |
+          VER=$(sed -n 's/^const appVersion = "\(.*\)"/\1/p' version.go)
+          echo "VER=$VER" >> "$GITHUB_ENV"
+          F=flatpak/hu.gozie.commander.metainfo.xml
+          grep -q "release version=\"$VER\"" $F || sed -i "s#<releases>#<releases>\n    <release version=\"$VER\" date=\"$(date +%F)\"/>#" $F
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: GozieCmd-${{ env.VER }}-x86_64.flatpak
+          manifest-path: flatpak/hu.gozie.commander.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+      - name: Kiadás / Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: GozieCmd-${{ env.VER }}-x86_64.flatpak

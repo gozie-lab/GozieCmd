@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Gozie Commander
+GenericName=File Manager
+GenericName[hu]=Fájlkezelő
+Comment=Two-panel file manager
+Comment[hu]=Kétpaneles fájlkezelő
+Exec=goziecmd
+Icon=hu.gozie.commander
+Terminal=false
+Categories=System;FileManager;Utility;
+Keywords=file;manager;commander;ftp;sftp;zip;
+Keywords[hu]=fájl;fájlkezelő;commander;ftp;sftp;zip;
+StartupWMClass=hu.gozie.commander

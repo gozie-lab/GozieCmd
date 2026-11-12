@@ -60,6 +60,7 @@ type App struct {
 var theApp *App
 
 func main() {
+	flatpakSetup() // még a napló előtt: az ideiglenes mappa helye
 	dlogReset()
 	dlog("%s %s indul (Linux)", appName, appVersion)
 	if f, err := os.OpenFile(dlogPath(), os.O_APPEND|os.O_WRONLY, 0o666); err == nil {
@@ -623,7 +624,7 @@ func (a *App) runCommandLine(inTerminal bool) {
 	}
 	c := exec.Command("sh", "-c", line)
 	c.Dir = dir
-	if err := startDetached(c); err != nil {
+	if err := startDetached(hostify(c)); err != nil {
 		a.warn(fmt.Sprintf(T("A parancs nem indítható:\n%s"), errText(err)))
 	}
 }
