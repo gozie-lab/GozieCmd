@@ -698,6 +698,8 @@ func themeTree(w walk.Window, dark bool) {
 	switch x := w.(type) {
 	case *walk.Label:
 		x.SetTextColor(fg)
+	case *walk.TextLabel:
+		x.SetTextColor(fg)
 	case *walk.LineEdit:
 		x.SetTextColor(fg)
 		x.SetBackground(editBg)
@@ -1272,15 +1274,4 @@ func paintHeaderItem(h win.HWND, hdc uintptr, rc win.RECT, item int, hot bool) {
 		flags |= dtCenter
 	}
 	drawText(hdc, text, &t, flags)
-}
-
-// cloakWindow eltakarja (vagy újra megmutatja) az ablakot a képernyőn úgy, hogy közben
-// a Windows szerint látható marad: elrendezhető és kirajzolható, de a felhasználó nem
-// látja a félkész állapotot (DWMWA_CLOAK).
-func cloakWindow(h win.HWND, on bool) {
-	var v int32
-	if on {
-		v = 1
-	}
-	procDwmSetWindowAttribute.Call(uintptr(h), 13, uintptr(unsafe.Pointer(&v)), 4)
 }

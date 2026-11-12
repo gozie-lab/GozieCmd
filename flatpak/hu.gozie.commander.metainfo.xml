@@ -64,6 +64,12 @@
     <control>pointing</control>
   </supports>
   <releases>
+    <release version="0.57" date="2026-11-12">
+      <description>
+        <p>Own signed Flatpak repository with updates through the software center; contact
+        address and website in the About window; flicker-free start-up on Windows.</p>
+      </description>
+    </release>
     <release version="0.52" date="2026-11-10">
       <description>
         <p>First Flatpak release.</p>

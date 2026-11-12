@@ -1,4 +1,4 @@
-Gozie Commander 0.52 – kétpaneles fájlkezelő Linuxra
+Gozie Commander 0.57 – kétpaneles fájlkezelő Linuxra
 =====================================================
 
 Telepítés (rendszergazda jog nem kell):
@@ -38,6 +38,7 @@ Szabad szoftver a GNU GPL 3. vagy későbbi változata szerint (LICENSE.txt / LI
 mindenféle garancia nélkül. A felhasznált könyvtárak licencei:
 THIRD_PARTY_LICENSES.txt.
 
-Flatpak: a kiadások között GozieCmd-X.YY-x86_64.flatpak néven is letölthető;
-megnyitva a Szoftverközpont telepíti. Ha előtte ezt a változatot telepítetted,
-előbb futtasd az eltavolit.sh-t, hogy a menüben ne legyen kétszer.
+Flatpak: a program Flatpakként is telepíthető, és akkor magától frissül:
+  flatpak install --user https://gozie-lab.github.io/GozieCmd/hu.gozie.commander.flatpakref
+Ha előtte ezt a változatot telepítetted, előbb futtasd az eltavolit.sh-t, hogy a
+menüben ne legyen kétszer. A beállítások közösek maradnak.

@@ -32,7 +32,7 @@ const dialTimeout = 20 * time.Second
 type sftpRaw struct {
 	conf remoteConf
 	busy func() bool // fut-e éppen átvitel (akkor nem kell életjel)
-	mu   sync.Mutex // csak a mezőkhöz; maguk a műveletek párhuzamosan futhatnak
+	mu   sync.Mutex  // csak a mezőkhöz; maguk a műveletek párhuzamosan futhatnak
 	ssh  *ssh.Client
 	c    *sftp.Client
 }
@@ -468,12 +468,12 @@ func (r *davRaw) size(p string) (int64, error) {
 	}
 	return st.Size(), nil
 }
-func (r *davRaw) mkdir(p string) error                         { return r.c.Mkdir(p, 0o755) }
-func (r *davRaw) remove(p string, dir bool) error              { return r.c.Remove(p) }
-func (r *davRaw) rename(from, to string) error                 { return r.c.Rename(from, to, false) }
-func (r *davRaw) chtimes(string, time.Time) error              { return nil } // a WebDAV nem tudja
-func (r *davRaw) reconnect() error                             { return nil } // HTTP: nincs állandó kapcsolat
-func (r *davRaw) close()                                       {}
+func (r *davRaw) mkdir(p string) error            { return r.c.Mkdir(p, 0o755) }
+func (r *davRaw) remove(p string, dir bool) error { return r.c.Remove(p) }
+func (r *davRaw) rename(from, to string) error    { return r.c.Rename(from, to, false) }
+func (r *davRaw) chtimes(string, time.Time) error { return nil } // a WebDAV nem tudja
+func (r *davRaw) reconnect() error                { return nil } // HTTP: nincs állandó kapcsolat
+func (r *davRaw) close()                          {}
 
 // ── SMB (Windows-megosztás) ──
 // Útvonal: "/" a megosztások listája, "/megosztás/mappa/…" a tartalom.

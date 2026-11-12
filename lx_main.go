@@ -8,6 +8,7 @@ package main
 import (
 	"fmt"
 	fynelang "fyne.io/fyne/v2/lang"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -200,7 +201,13 @@ func main() {
 	})
 	a.win.ShowAndRun()
 	if restartAfterExit {
-		startSelf()
+		if inFlatpak { // a frissített Flatpak új példánya a gazdarendszerről indul
+			if c := hostify(exec.Command("flatpak", "run", os.Getenv("FLATPAK_ID"))); c.Start() == nil {
+				c.Process.Release()
+			}
+		} else {
+			startSelf()
+		}
 	}
 }
 
@@ -734,9 +741,7 @@ func (a *App) menu() *fyne.MainMenu {
 		item(T("Billentyűparancsok   F1"), a.help, nil),
 		item(T("Diagnosztikai napló"), func() { a.showViewer(dlogPath()) }, nil),
 		item(T("Frissítés keresése…"), func() { a.checkUpdate(true) }, nil),
-		item(T("Névjegy"), func() {
-			dialog.ShowInformation(T("Névjegy"), aboutText(), a.win)
-		}, nil),
+		item(T("Névjegy"), a.showAbout, nil),
 	)
 	tools := fyne.NewMenu(T("Eszközök"),
 		item(T("Fájlok összehasonlítása tartalom szerint…"), a.compareContent, nil),
@@ -779,4 +784,21 @@ func widgetDialog(parent fyne.Window, title string, content fyne.CanvasObject, o
 	}, parent)
 	d.Resize(fyne.NewSize(420, 0))
 	return d
+}
+
+// showAbout: névjegy a honlap és a hibabejelentési cím linkjével.
+func (a *App) showAbout() {
+	link := func(text, target string) *widget.Hyperlink {
+		h := widget.NewHyperlink(text, nil)
+		h.OnTapped = func() { a.openFile(target) } // Flatpakban is a rendszer programjával
+		return h
+	}
+	mail := contactEmail()
+	box := container.NewVBox(
+		widget.NewLabel(aboutText()),
+		widget.NewLabel(T("Hiba, észrevétel, ötlet:")),
+		link(mail, "mailto:"+mail+"?subject="+url.PathEscape(appName+" "+appVersion)),
+		link(strings.TrimSuffix(strings.TrimPrefix(homePage, "https://"), "/"), homePage),
+	)
+	dialog.ShowCustom(T("Névjegy"), T("Bezárás"), box, a.win)
 }

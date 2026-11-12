@@ -200,32 +200,33 @@ func savePlacement(a *App, h win.HWND, key string) {
 
 // restorePlacement true, ha volt mentett, látható helyre eső méret.
 func restorePlacement(a *App, h win.HWND, key string) bool {
-	ok, _ := placeWindow(a, h, key, false)
+	ok, _, _ := placeWindow(a, h, key, false)
 	return ok
 }
 
 // placeWindow visszaállítja a mentett helyet. hidden esetén az ablak rejtve marad
-// (csak a helye és a mérete áll be); a második érték, hogy teljes méretű volt-e.
-func placeWindow(a *App, h win.HWND, key string, hidden bool) (bool, bool) {
+// (csak a helye és a mérete áll be); a második érték, hogy teljes méretű volt-e,
+// a harmadik a mentett normál hely (munkaterület-koordinátában).
+func placeWindow(a *App, h win.HWND, key string, hidden bool) (bool, bool, win.RECT) {
 	v, _ := a.settings.Get("win_" + key)
 	parts := strings.Split(v, ",")
 	if len(parts) != 5 {
-		return false, false
+		return false, false, win.RECT{}
 	}
 	var n [5]int32
 	for i, s := range parts {
 		x, err := strconv.Atoi(strings.TrimSpace(s))
 		if err != nil {
-			return false, false
+			return false, false, win.RECT{}
 		}
 		n[i] = int32(x)
 	}
 	r := win.RECT{Left: n[0], Top: n[1], Right: n[2], Bottom: n[3]}
 	if r.Right-r.Left < 200 || r.Bottom-r.Top < 150 {
-		return false, false
+		return false, false, win.RECT{}
 	}
 	if m, _, _ := procMonitorFromRect.Call(uintptr(unsafe.Pointer(&r)), 0); m == 0 {
-		return false, false // a mentett hely már nincs egyik képernyőn sem
+		return false, false, win.RECT{} // a mentett hely már nincs egyik képernyőn sem
 	}
 	dlog("ablakhely visszaállítása (%s): %s", key, v)
 	maxed := n[4] == 1
@@ -237,8 +238,35 @@ func placeWindow(a *App, h win.HWND, key string, hidden bool) (bool, bool) {
 		wp.ShowCmd = win.SW_SHOWMAXIMIZED
 	}
 	wp.Length = uint32(unsafe.Sizeof(wp))
-	return win.SetWindowPlacement(h, &wp), maxed
+	return win.SetWindowPlacement(h, &wp), maxed, r
 }
+
+// maximizedRect: hol lesz a teljes méretre nagyított ablak azon a képernyőn, ahol a
+// mentett hely van – a munkaterület, a keret vastagságával kibővítve (így áll a Windows
+// is a nagyított ablakot). A rejtett ablak erre méretezve a végleges elrendezést kapja.
+func maximizedRect(h win.HWND, normal win.RECT) (win.RECT, bool) {
+	m, _, _ := procMonitorFromRect.Call(uintptr(unsafe.Pointer(&normal)), 2) // MONITOR_DEFAULTTONEAREST
+	var mi win.MONITORINFO
+	mi.CbSize = uint32(unsafe.Sizeof(mi))
+	if m == 0 || !win.GetMonitorInfo(win.HMONITOR(m), &mi) {
+		return win.RECT{}, false
+	}
+	dpi := uintptr(win.GetDpiForWindow(h))
+	metric := func(i uintptr) int32 {
+		if procGetSystemMetricsForDpi.Find() == nil && dpi != 0 {
+			v, _, _ := procGetSystemMetricsForDpi.Call(i, dpi)
+			return int32(v)
+		}
+		return win.GetSystemMetrics(int32(i))
+	}
+	const smCxSizeFrame, smCySizeFrame, smCxPaddedBorder = 32, 33, 92
+	fx := metric(smCxSizeFrame) + metric(smCxPaddedBorder)
+	fy := metric(smCySizeFrame) + metric(smCxPaddedBorder)
+	w := mi.RcWork
+	return win.RECT{Left: w.Left - fx, Top: w.Top - fy, Right: w.Right + fx, Bottom: w.Bottom + fy}, true
+}
+
+var procGetSystemMetricsForDpi = user32.NewProc("GetSystemMetricsForDpi")
 
 // sizeableDialog átméretezhetővé, teljes méretre nagyíthatóvá teszi a dialógust,
 // megnyitáskor visszaállítja a mentett méretét (vagy az alapméretet a szülő közepén),

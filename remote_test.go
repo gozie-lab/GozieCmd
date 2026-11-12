@@ -428,9 +428,9 @@ func (s *stuckRaw) put(p string, in io.Reader, size int64) error {
 	b, _ := io.ReadAll(in)
 	return os.WriteFile(filepath.Join(s.root, p), b, 0o644)
 }
-func (s *stuckRaw) size(p string) (int64, error) { return s.halfRaw.size(p) }
-func (s *stuckRaw) list(string) ([]rawInfo, error) { return nil, nil }
-func (s *stuckRaw) remove(p string, _ bool) error { return os.Remove(filepath.Join(s.root, p)) }
+func (s *stuckRaw) size(p string) (int64, error)    { return s.halfRaw.size(p) }
+func (s *stuckRaw) list(string) ([]rawInfo, error)  { return nil, nil }
+func (s *stuckRaw) remove(p string, _ bool) error   { return os.Remove(filepath.Join(s.root, p)) }
 func (s *stuckRaw) chtimes(string, time.Time) error { return nil }
 func (s *stuckRaw) close() {
 	s.mu.Lock()

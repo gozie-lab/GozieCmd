@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 	"unicode/utf16"
+	"unsafe"
 
 	"github.com/lxn/walk"
 	. "github.com/lxn/walk/declarative"
@@ -219,29 +220,38 @@ func main() {
 		first = app.right
 	}
 	app.setActive(first)
-	// Indulás villanás nélkül: a mentett helyet és méretet még a megjelenés előtt,
-	// rejtve állítjuk be, az ablakot pedig „letakarva” (DWM cloak) mutatjuk meg, amíg
-	// az elrendezés és a kirajzolás le nem fut. Így nem látszik sem az alapméret,
-	// sem a félig kirajzolt, fehér terület.
-	placed, maxed := placeWindow(app, app.mw.Handle(), "main", true)
+	// Indulás villanás nélkül: a mentett helyet és méretet még a Run előtt, rejtve
+	// állítjuk be, így a walk az elrendezést már a végleges méretre számolja ki, és
+	// az ablak egyetlen lépésben, kész tartalommal jelenik meg. (A korábbi DWM-takarás
+	// Windows 11-en maga okozott egy rövid felvillanást, ezért nincs többé.)
+	placed, maxed, normal := placeWindow(app, app.mw.Handle(), "main", true)
 	dlog("ablakhely visszaállítása: %v (teljes méret: %v)", placed, maxed)
+	if maxed {
+		// Teljes méretnél a rejtett ablak már most a nagyított méretet kapja, így az
+		// elrendezés arra készül el, és a megjelenéskor nincs átrendezés.
+		if mr, ok := maximizedRect(app.mw.Handle(), normal); ok {
+			win.SetWindowPos(app.mw.Handle(), 0, mr.Left, mr.Top, mr.Right-mr.Left, mr.Bottom-mr.Top,
+				win.SWP_NOZORDER|win.SWP_NOACTIVATE)
+		}
+	}
 	app.mw.Starting().Attach(func() {
 		app.mw.Synchronize(func() {
 			h := app.mw.Handle()
-			cloakWindow(h, true)
 			if maxed {
 				win.ShowWindow(h, win.SW_SHOWMAXIMIZED)
+				// a fenti átméretezés a normál helyet is átírta: visszaállítjuk, hogy a
+				// „Kis méret” gomb a mentett méretre álljon vissza
+				wp := win.WINDOWPLACEMENT{RcNormalPosition: normal, ShowCmd: win.SW_SHOWMAXIMIZED}
+				wp.Length = uint32(unsafe.Sizeof(wp))
+				win.SetWindowPlacement(h, &wp)
 			} else {
 				win.ShowWindow(h, win.SW_SHOWNORMAL) // a walk Show() magától nem aktiválná
 			}
-			app.mw.Show()
+			app.mw.Show() // a walk belső állapota (látható) és az elrendezés frissítése
+			win.RedrawWindow(h, nil, 0, win.RDW_INVALIDATE|win.RDW_ERASE|win.RDW_FRAME|win.RDW_ALLCHILDREN|win.RDW_UPDATENOW)
 			first.tv.SetFocus()
-			app.mw.Synchronize(func() { // a függő elrendezés után
-				win.RedrawWindow(h, nil, 0, win.RDW_INVALIDATE|win.RDW_ERASE|win.RDW_FRAME|win.RDW_ALLCHILDREN|win.RDW_UPDATENOW)
-				cloakWindow(h, false)
-				app.startUpdateCheck()
-				app.initPasswordPrompt()
-			})
+			app.startUpdateCheck()
+			app.initPasswordPrompt()
 		})
 	})
 
@@ -437,9 +447,7 @@ func (a *App) menu() []MenuItem {
 			Action{Text: T("Billentyűparancsok"), Shortcut: sc(0, walk.KeyF1), OnTriggered: a.help},
 			Action{Text: T("Diagnosztikai napló"), OnTriggered: func() { showViewer(a.mw, dlogPath()) }},
 			Action{Text: T("Frissítés keresése…"), OnTriggered: func() { a.checkUpdate(true) }},
-			Action{Text: T("Névjegy"), OnTriggered: func() {
-				walk.MsgBox(a.mw, T("Névjegy"), aboutText(), walk.MsgBoxIconInformation)
-			}},
+			Action{Text: T("Névjegy"), OnTriggered: a.showAbout},
 		}},
 	}
 }

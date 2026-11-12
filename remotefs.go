@@ -190,8 +190,8 @@ type genFS struct {
 	// A műveletek párhuzamosan futhatnak (az SFTP, a WebDAV és az SMB is bírja), így egy
 	// hosszú háttérmásolás alatt is azonnal listázható a mappa. Csak az újracsatlakozás
 	// kizárólagos.
-	mu      sync.RWMutex
-	gen     uint64 // hányadik kapcsolat (újracsatlakozáskor nő)
+	mu  sync.RWMutex
+	gen uint64 // hányadik kapcsolat (újracsatlakozáskor nő)
 	idleTrack
 
 	// Őr: ha egy művelet sokáig semmit nem halad (a szerver nem válaszol), a kapcsolatot

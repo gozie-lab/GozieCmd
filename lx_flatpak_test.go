@@ -48,3 +48,11 @@ func TestFlatpakHost(t *testing.T) {
 		t.Fatal("Flatpakon kívül nem változhat")
 	}
 }
+
+func TestFlatpakHasVersion(t *testing.T) {
+	list := "org.mozilla.firefox\t140.0\nhu.gozie.commander\t0.52\nhu.gozie.commander\t0.53\n"
+	if !flatpakHasVersion(list, "hu.gozie.commander", "0.53") || flatpakHasVersion(list, "hu.gozie.commander", "0.54") ||
+		flatpakHasVersion(list, "hu.gozie", "0.52") {
+		t.Fatal("rossz egyezés")
+	}
+}

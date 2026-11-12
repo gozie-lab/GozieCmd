@@ -49,7 +49,9 @@ jobs:
           body_path: notes.md
           files: dist/*
 
-  # Flatpak-csomag (GozieCmd-X.YY-x86_64.flatpak) – a fenti kiadáshoz csatolva.
+  # Flatpak: aláírt tároló a GitHub Pages-en (https://gozie-lab.github.io/GozieCmd/), és egy
+  # .flatpak fájl a kiadáshoz, amely telepítéskor ezt a tárolót is hozzáadja (így frissül).
+  # Kell hozzá a FLATPAK_GPG_KEY titok (a tároló aláíró kulcsa).
   # Ha ez a lépés nem sikerül, a többi letöltés attól még kikerül.
   flatpak:
     needs: build
@@ -57,6 +59,8 @@ jobs:
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
+    env:
+      REPO_URL: https://gozie-lab.github.io/GozieCmd
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
@@ -71,13 +75,50 @@ jobs:
           echo "VER=$VER" >> "$GITHUB_ENV"
           F=flatpak/hu.gozie.commander.metainfo.xml
           grep -q "release version=\"$VER\"" $F || sed -i "s#<releases>#<releases>\n    <release version=\"$VER\" date=\"$(date +%F)\"/>#" $F
-      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
-        with:
-          bundle: GozieCmd-${{ env.VER }}-x86_64.flatpak
-          manifest-path: flatpak/hu.gozie.commander.yml
-          cache-key: flatpak-builder-${{ github.sha }}
+      - name: Aláíró kulcs / Signing key
+        env:
+          FLATPAK_GPG_KEY: ${{ secrets.FLATPAK_GPG_KEY }}
+        run: |
+          [ -n "$FLATPAK_GPG_KEY" ] || { echo "Hiányzik a FLATPAK_GPG_KEY titok (Settings › Secrets and variables › Actions)"; exit 1; }
+          mkdir -m 700 "$PWD/gpg"
+          printf '%s\n' "$FLATPAK_GPG_KEY" | gpg --homedir "$PWD/gpg" --batch --import
+          echo "GPG_ID=$(gpg --homedir "$PWD/gpg" --list-secret-keys --with-colons | awk -F: '/^fpr/{print $10; exit}')" >> "$GITHUB_ENV"
+      - name: Fordítás és tároló / Build and repository
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          mkdir -p site
+          flatpak-builder --user --install-deps-from=flathub --disable-rofiles-fuse --default-branch=stable \
+            --repo=site/repo --gpg-sign="$GPG_ID" --gpg-homedir="$PWD/gpg" --force-clean \
+            build flatpak/hu.gozie.commander.yml
+          flatpak build-update-repo --generate-static-deltas --prune --default-branch=stable \
+            --title="Gozie Commander" --gpg-sign="$GPG_ID" --gpg-homedir="$PWD/gpg" site/repo
+          flatpak build-bundle --repo-url="$REPO_URL/repo/" \
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
+            --gpg-keys=flatpak/gozie-flatpak.gpg --gpg-sign="$GPG_ID" --gpg-homedir="$PWD/gpg" \
+            site/repo "GozieCmd-$VER-x86_64.flatpak" hu.gozie.commander stable
+          sh flatpak/tarolo.sh site "$REPO_URL" "$VER"
+          rm -rf "$PWD/gpg"
+          ls -la site "GozieCmd-$VER-x86_64.flatpak"
       - name: Kiadás / Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: GozieCmd-${{ env.VER }}-x86_64.flatpak
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  # A Flatpak-tároló közzététele (GitHub Pages: Settings › Pages › Source: GitHub Actions).
+  pages:
+    needs: flatpak
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

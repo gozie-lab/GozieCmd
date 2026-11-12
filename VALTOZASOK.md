@@ -3,6 +3,38 @@
 A kiadások leírása innen készül: a GitHub Actions a verzióhoz tartozó szakaszt
 teszi a kiadás oldalára. Új kiadás előtt ide kerül egy új `## X.YY` szakasz.
 
+## 0.57
+
+### Flatpak-tároló / Flatpak repository
+
+- A Flatpak-változat saját, aláírt tárolóból telepíthető, és ezután a Szoftverközpont
+  (GNOME Szoftverek, Discover) vagy a `flatpak update` frissíti:
+  `flatpak install --user https://gozie-lab.github.io/GozieCmd/hu.gozie.commander.flatpakref`
+  A telepítési útmutató: https://gozie-lab.github.io/GozieCmd/
+  *The Flatpak version can be installed from its own signed repository and is then
+  updated by the software center or `flatpak update`.*
+- A kiadásokhoz csatolt `.flatpak` fájl telepítéskor a tárolót is hozzáadja, így az is
+  frissíthető. A 0.52-es `.flatpak` fájlból telepített példányt egyszer újra kell
+  telepíteni a tárolóból vagy az új fájlból.
+  *The attached `.flatpak` file now adds the repository on install. Installations from
+  the 0.52 `.flatpak` file need to be reinstalled once.*
+- Flatpakban a *Súgó › Frissítés keresése* egy gombbal frissít, majd újraindítja a programot.
+  *In the Flatpak version, Help › Check for updates updates and restarts with one click.*
+
+### Névjegy / About
+
+- A Névjegy ablakban kattintható link vezet a hibabejelentési és észrevételi
+  e-mail-címre, valamint a honlapra (cmd.gozie.hu).
+  *The About window links to the contact e-mail address for bugs and feedback and to
+  the website (cmd.gozie.hu).*
+
+### Windows
+
+- Induláskor az ablak egy lépésben, kész tartalommal jelenik meg a mentett helyén és
+  méretében, teljes méretű ablaknál is, felvillanás nélkül.
+  *At start-up the window appears in one step at its saved position and size, also
+  when maximized, without flashing.*
+
 ## 0.52
 
 - Flatpak-csomag: `GozieCmd-0.52-x86_64.flatpak`. Megnyitva a Szoftverközpont vagy a

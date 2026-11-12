@@ -6,7 +6,10 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -96,14 +99,61 @@ func (a *App) offerUpdate(r *release) {
 		})
 }
 
-// offerFlatpakUpdate: a Flatpak-csomag nem cserélheti le magát; az új .flatpak fájlt a
-// felhasználó tölti le és nyitja meg (a Szoftverközpont vagy a flatpak install telepíti).
+// offerFlatpakUpdate: Flatpakban a program nem cseréli le magát, hanem a gazdarendszer
+// flatpak parancsával frissül a Gozie Commander Flatpak-tárolójából. Ha a programot
+// tároló nélkül, egy régi .flatpak fájlból telepítették, a letöltési oldalt ajánlja.
 func (a *App) offerFlatpakUpdate(r *release) {
-	msg := fmt.Sprintf(T("Elérhető az új verzió: %s (most: %s).\n\nA Flatpak-változathoz töltsd le a GozieCmd-%s-x86_64.flatpak fájlt a letöltési oldalról, és nyisd meg (a Szoftverközpont telepíti), vagy terminálban:\nflatpak install --user GozieCmd-%s-x86_64.flatpak"),
-		r.version(), appVersion, r.version(), r.version())
-	a.choice(T("Programfrissítés"), msg, []string{T("Letöltési oldal"), T("Később")}, 0, func(i int) {
-		if i == 0 {
-			a.openFile(r.notesURL())
+	a.choice(T("Programfrissítés"), updateAvailableText(r),
+		[]string{T("Frissítés most"), T("Újdonságok"), T("Később")}, 0, func(i int) {
+			switch i {
+			case 0:
+				a.flatpakUpdate(r)
+			case 1:
+				a.openFile(r.notesURL())
+				a.offerFlatpakUpdate(r)
+			}
+		})
+}
+
+func (a *App) flatpakUpdate(r *release) {
+	id := os.Getenv("FLATPAK_ID")
+	var out []byte
+	a.runJob(T("Programfrissítés"), func(j *job) error {
+		j.Status(fmt.Sprintf(T("%s letöltése"), appName+" "+r.version()))
+		var err error
+		out, err = hostify(exec.Command("flatpak", "update", "-y", "--noninteractive", id)).CombinedOutput()
+		dlog("flatpak update: %v\n%s", err, out)
+		return nil
+	}, func(error) {
+		list, _ := hostify(exec.Command("flatpak", "list", "--app", "--columns=application,version")).Output()
+		if !flatpakHasVersion(string(list), id, r.version()) {
+			a.choice(T("Programfrissítés"), fmt.Sprintf(T("A Flatpak nem találta meg az új verziót. Valószínűleg egy régebbi .flatpak fájlból telepítetted, amely még nem kapcsolódik a Gozie Commander tárolójához.\n\nTelepítsd egyszer az új GozieCmd-%s-x86_64.flatpak fájlt a letöltési oldalról: utána a frissítés már magától megy."), r.version()),
+				[]string{T("Letöltési oldal"), T("Bezárás")}, 0, func(i int) {
+					if i == 0 {
+						a.openFile(r.notesURL())
+					}
+				})
+			return
 		}
+		a.choice(T("Programfrissítés"), fmt.Sprintf(T("A frissítés kész (%s). Újraindítsam most a programot?"), r.version()),
+			[]string{T("Újraindítás"), T("Később")}, 0, func(i int) {
+				if i == 0 {
+					restartAfterExit = true
+					a.quit()
+				}
+			})
 	})
+}
+
+// flatpakHasVersion: a „flatpak list --columns=application,version” kimenetében a
+// program telepített verziója (vagy egyike, ha felhasználói és rendszerszinten is van)
+// megegyezik-e a várttal. Ez a kimenet nem függ a rendszer nyelvétől.
+func flatpakHasVersion(list, id, ver string) bool {
+	for _, ln := range strings.Split(list, "\n") {
+		f := strings.Fields(ln)
+		if len(f) >= 2 && f[0] == id && f[1] == ver {
+			return true
+		}
+	}
+	return false
 }

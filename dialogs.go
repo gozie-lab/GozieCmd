@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -437,5 +438,46 @@ func (a *App) help() {
 	}
 	themeDialog(dlg)
 	a.sizeableDialog(dlg, a.mw, "help", 760, 780)
+	dlg.Run()
+}
+
+// showAbout: névjegy a honlap és a hibabejelentési cím linkjével.
+func (a *App) showAbout() {
+	var dlg *walk.Dialog
+	var ok *walk.PushButton
+	mail := contactEmail()
+	open := func(link *walk.LinkLabelLink) { shellOpen(a.mw.Handle(), link.URL(), "") }
+	err := Dialog{
+		AssignTo:      &dlg,
+		Title:         T("Névjegy"),
+		DefaultButton: &ok,
+		CancelButton:  &ok,
+		MinSize:       Size{Width: 380},
+		Layout:        VBox{},
+		Children: []Widget{
+			// TextLabel: a többsoros szöveg minden sora látszik (a Label csak egy sort mutat)
+			TextLabel{Text: aboutText()},
+			VSpacer{Size: 6},
+			Label{Text: T("Hiba, észrevétel, ötlet:")},
+			LinkLabel{
+				Text:            fmt.Sprintf(`<a href="mailto:%s?subject=%s">%s</a>`, mail, url.PathEscape(appName+" "+appVersion), mail),
+				Alignment:       AlignHNearVCenter,
+				OnLinkActivated: open,
+			},
+			LinkLabel{
+				Text:            fmt.Sprintf(`<a href="%s">%s</a>`, homePage, strings.TrimSuffix(strings.TrimPrefix(homePage, "https://"), "/")),
+				Alignment:       AlignHNearVCenter,
+				OnLinkActivated: open,
+			},
+			Composite{Layout: HBox{MarginsZero: true}, Children: []Widget{
+				HSpacer{},
+				PushButton{AssignTo: &ok, Text: "OK", OnClicked: func() { dlg.Accept() }},
+			}},
+		},
+	}.Create(a.mw)
+	if err != nil {
+		return
+	}
+	themeDialog(dlg)
 	dlg.Run()
 }

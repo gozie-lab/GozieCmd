@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gozie Commander – Flatpak</title>
+<style>
+  body { font: 17px/1.6 "Noto Sans", "Segoe UI", system-ui, sans-serif; max-width: 46rem; margin: 3rem auto; padding: 0 1.25rem; color: #18212e; background: #eceef1; }
+  h1 { color: #143c78; margin-bottom: .25rem; }
+  code, pre { font-family: "DejaVu Sans Mono", monospace; background: #fff; border-radius: 4px; }
+  code { padding: 1px 5px; }
+  pre { padding: .75rem 1rem; overflow-x: auto; border-left: 4px solid #0078d7; }
+  a { color: #005fae; }
+  .btn { display: inline-block; background: #0078d7; color: #fff; padding: .6rem 1.1rem; border-radius: 6px; text-decoration: none; font-weight: 700; }
+  @media (prefers-color-scheme: dark) { body { background: #0d1828; color: #e6ecf4; } h1 { color: #fff; } code, pre { background: #142338; } a { color: #6cb6ff; } }
+</style>
+</head>
+<body>
+<h1>Gozie Commander – Flatpak</h1>
+<p>A Gozie Commander Flatpak-tárolója. Innen telepítve a program a Szoftverközponttal
+(Discover, GNOME Szoftverek) vagy a <code>flatpak update</code> paranccsal frissül.
+Legújabb változat: <strong>@VER@</strong>.</p>
+
+<p><a class="btn" href="@URL@/hu.gozie.commander.flatpakref">Telepítés</a></p>
+<p>A gomb egy <code>.flatpakref</code> fájlt tölt le; megnyitva a Szoftverközpont telepíti.
+Terminálból:</p>
+<pre>flatpak install --user @URL@/hu.gozie.commander.flatpakref</pre>
+
+<p>Frissítés: a Szoftverközpont magától jelzi, vagy</p>
+<pre>flatpak update hu.gozie.commander</pre>
+
+<p>A futtatókörnyezet (org.freedesktop.Platform) a Flathubról érkezik, ezt a telepítés
+magától hozzáadja. A csomagok GPG-kulccsal vannak aláírva.</p>
+
+<hr>
+<p lang="en"><strong>English:</strong> the Flatpak repository of Gozie Commander. Click
+<em>Telepítés</em> (Install) or run the command above; updates arrive through your software
+center or <code>flatpak update</code>.</p>
+<p><a href="https://cmd.gozie.hu/">cmd.gozie.hu</a> · <a href="https://github.com/gozie-lab/GozieCmd">GitHub</a></p>
+</body>
+</html>
