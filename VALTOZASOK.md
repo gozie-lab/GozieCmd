@@ -3,6 +3,25 @@
 A kiadások leírása innen készül: a GitHub Actions a verzióhoz tartozó szakaszt
 teszi a kiadás oldalára. Új kiadás előtt ide kerül egy új `## X.YY` szakasz.
 
+## 0.59
+
+- Archívumban vagy távoli helyen (FTP, SFTP, WebDAV, SMB) lévő fájl szerkesztése (F4):
+  a szerkesztőben mentve a program a fájlt automatikusan visszaírja az eredeti helyére,
+  és ezt a panel alján jelzi. Windowson eddig ez a művelet nem volt elérhető, Linuxon
+  a módosítás nem került vissza.
+  *Editing a file inside an archive or on a remote location (F4): saving in the editor
+  writes it back automatically.*
+- Húzd és ejtsd archívumból és távoli helyről is (a másik panelre, a célpanel egy
+  mappájára, Windowson az Intézőbe is), valamint archívumba és távoli helyre.
+  *Drag and drop from and to archives and remote locations.*
+- Linux: húzás közben az egér mellett címke mutatja, mi kerül hová (másolás vagy
+  mozgatás); a panel üres részére kattintva a panel aktív lesz.
+  *Linux: a label next to the pointer shows what is dragged where; clicking the empty
+  part of a panel activates it.*
+- Jobb gombos kijelölésnél a nyomva tartott sor alján egy sáv mutatja, mikor jön elő
+  a helyi menü.
+  *With right-button selection, a bar on the held row shows when the context menu appears.*
+
 ## 0.58
 
 - A Flatpak-tároló és a `.flatpak` fájl elkészítése javítva: a 0.57-ben leírt

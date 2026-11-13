@@ -63,6 +63,7 @@ type App struct {
 	icon         *walk.Icon
 	dragSrc      *Panel   // a saját húzás forráspanelje
 	dragFiles    []string // és a húzott fájlok
+	dragEntries  []*Entry // archívumból / távoli helyről húzott elemek (a fájlok ideiglenes példányok)
 }
 
 func main() {
@@ -671,11 +672,16 @@ func (a *App) viewFile() {
 }
 
 func (a *App) editFile() {
-	if a.notInVFS() {
+	e := a.active.currentEntry()
+	if e == nil || e.IsDir || e.IsParent {
 		return
 	}
-	e := a.active.currentEntry()
-	if e == nil || e.IsDir {
+	if p := a.active; p.vfs != nil {
+		if p.kind() == "net" {
+			a.notInVFS()
+			return
+		}
+		a.editVirtual(p, e)
 		return
 	}
 	if err := a.openInEditor(e.Path, a.active.path); err != nil {
@@ -1048,7 +1054,11 @@ func (a *App) handleDrop(p *Panel, files []string, target string, move, right bo
 	if a.dragSrc != nil && len(a.dragFiles) == len(files) && strings.EqualFold(a.dragFiles[0], files[0]) {
 		src = a.dragSrc
 	}
-	a.dragSrc, a.dragFiles = nil, nil
+	ents := a.dragEntries
+	a.dragSrc, a.dragFiles, a.dragEntries = nil, nil, nil
+	if src != nil && src.vfs != nil && src == p {
+		return // archívumból / távoli helyről önmagára
+	}
 	if right {
 		switch popupChoice(a.mw.Handle(), []string{T("Másolás ide"), T("Mozgatás ide"), "-", T("Mégse")}) {
 		case 1:
@@ -1062,6 +1072,16 @@ func (a *App) handleDrop(p *Panel, files []string, target string, move, right bo
 		return
 	}
 	a.setActive(p)
+	if src != nil && src.vfs != nil && len(ents) > 0 {
+		// archívumból / távoli helyről húzva: közvetlenül onnan (nem az ideiglenes
+		// példányokból), így a mozgatás az eredetieket törli, és mappába is ejthető
+		t := target
+		if p.vfs != nil {
+			t = "" // a célpanel archívum / távoli hely: annak a mappájába
+		}
+		a.vfsTransferTo(src, p, ents, move, t, false)
+		return
+	}
 	if p.vfs != nil {
 		a.localToVFS(nil, files, p, move)
 		return

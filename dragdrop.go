@@ -9,10 +9,13 @@ package main
 // Ezen kívül az egér oldalsó (vissza/előre) gombjai is működnek.
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/lxn/win"
@@ -36,6 +39,7 @@ var (
 	procFindWindowExW      = user32.NewProc("FindWindowExW")
 	procAppendMenuW        = user32.NewProc("AppendMenuW")
 	procTrackPopupMenuEx   = user32.NewProc("TrackPopupMenuEx")
+	procGetAsyncKeyState   = user32.NewProc("GetAsyncKeyState")
 )
 
 const (
@@ -259,7 +263,7 @@ func createHelper(iid *guid) uintptr {
 
 // startDrag a lista kezdeményezésére (LVN_BEGINDRAG) indítja a húzást.
 func (p *Panel) startDrag(row int, right bool) {
-	if p.vfs != nil || row < 0 || row >= len(p.model.items) {
+	if row < 0 || row >= len(p.model.items) || p.kind() == "net" {
 		return
 	}
 	e := p.model.items[row]
@@ -271,8 +275,18 @@ func (p *Panel) startDrag(row int, right bool) {
 		ents = p.selectedEntries()
 	}
 	paths := entryPaths(ents)
+	base := p.path
+	if p.vfs != nil {
+		// Archívumból / távoli helyről: az elemek előbb egy ideiglenes mappába kerülnek,
+		// mert az Intéző és a többi program csak valódi fájlokat fogad. A másik
+		// panelre ejtve a program az eredeti helyről másol (handleDrop).
+		var ok bool
+		if base, paths, ok = p.stageDrag(ents, right); !ok {
+			return
+		}
+	}
 	dlog("húzás indul: %d elem, jobb gomb: %v, első: %s", len(paths), right, paths[0])
-	pdo, cleanup, ok := shellDataObject(p.path, paths)
+	pdo, cleanup, ok := shellDataObject(base, paths)
 	if !ok {
 		return
 	}
@@ -285,7 +299,10 @@ func (p *Panel) startDrag(row int, right bool) {
 		comRelease(helper)
 	}
 	ds := &dropSource{vtbl: &dropSourceVtbl, right: right}
-	p.app.dragSrc, p.app.dragFiles = p, paths
+	p.app.dragSrc, p.app.dragFiles, p.app.dragEntries = p, paths, nil
+	if p.vfs != nil {
+		p.app.dragEntries = ents
+	}
 	var effect uint32
 	hr, _, _ := procDoDragDrop.Call(pdo, uintptr(unsafe.Pointer(ds)), dropCopy|dropMove|dropLink, uintptr(unsafe.Pointer(&effect)))
 	dlog("DoDragDrop vége: 0x%X, hatás: %d", hr, effect)
@@ -412,6 +429,9 @@ func (p *Panel) dropTargetAt(screen win.POINT, files []string) (string, int) {
 		return "", -1 // a gépek / megosztások listájára nem lehet ejteni
 	}
 	if p.vfs != nil {
+		if p.app.dragSrc == p {
+			return "", -1 // archívumból / távoli helyről önmagára nem
+		}
 		return p.vfs.Display(p.vpath), -1
 	}
 	pt := screen
@@ -665,7 +685,54 @@ func popupChoice(owner win.HWND, items []string) int {
 // ── kijelölés jobb egérgombbal (klasszikus kétpaneles mód): nyomásra a sor kijelölése vált,
 // lenyomva tartva húzással több sor; 1 mp mozdulatlan nyomvatartás után helyi menü ──
 
-const rsTimer = 0xD1
+const (
+	rsTimer    = 0xD1
+	rsBarTimer = 0xD2 // a nyomva tartás jelzősávjának frissítése
+)
+
+// drawHoldBar: jobb gombos kijelölésnél a nyomva tartott sor alján egy sáv telik meg
+// a helyi menü megjelenéséig (0,2 másodperc után indul, hogy egy rövid kattintásnál
+// ne villanjon fel). Közvetlenül a listára rajzol; ha a sor újrarajzolódik, a
+// következő lépés pótolja.
+func (p *Panel) drawHoldBar(lv win.HWND) {
+	if !p.rsActive || p.rsMoved || p.rsStart < 0 {
+		p.stopHoldBar(lv)
+		return
+	}
+	f := (float64(time.Since(p.rsT0)) - float64(200*time.Millisecond)) / float64(800*time.Millisecond)
+	if f <= 0 {
+		return
+	}
+	if f > 1 {
+		f = 1
+	}
+	rc := win.RECT{Left: 0}                                                                 // LVIR_BOUNDS
+	if win.SendMessage(lv, 0x100E, uintptr(p.rsStart), uintptr(unsafe.Pointer(&rc))) == 0 { // LVM_GETITEMRECT
+		return
+	}
+	var cl win.RECT
+	win.GetClientRect(lv, &cl)
+	if rc.Right > cl.Right {
+		rc.Right = cl.Right
+	}
+	h := int32(3 * win.GetDpiForWindow(lv) / 96)
+	if h < 2 {
+		h = 2
+	}
+	bar := win.RECT{Left: rc.Left, Top: rc.Bottom - h, Right: rc.Left + int32(float64(rc.Right-rc.Left)*f), Bottom: rc.Bottom}
+	hdc := win.GetDC(lv)
+	fillRect(uintptr(hdc), &bar, cur.CursorFg)
+	win.ReleaseDC(lv, hdc)
+	p.rsBar = bar
+}
+
+func (p *Panel) stopHoldBar(lv win.HWND) {
+	win.KillTimer(lv, rsBarTimer)
+	if p.rsBar.Right > p.rsBar.Left {
+		win.InvalidateRect(lv, &p.rsBar, true)
+		p.rsBar = win.RECT{}
+	}
+}
 
 func (p *Panel) rowAtY(lv win.HWND, y int32) int {
 	var ht struct {
@@ -708,6 +775,8 @@ func (p *Panel) rightSelectMsg(lv win.HWND, msg uint32, wp, lp uintptr) bool {
 		}
 		win.SetCapture(lv)
 		win.SetTimer(lv, rsTimer, 1000, 0)
+		p.rsT0, p.rsBar = time.Now(), win.RECT{}
+		win.SetTimer(lv, rsBarTimer, 30, 0)
 		return true
 	case 0x0200: // WM_MOUSEMOVE
 		if wp&0x0002 == 0 { // a gombot közben elengedték
@@ -735,6 +804,7 @@ func (p *Panel) rightSelectMsg(lv win.HWND, msg uint32, wp, lp uintptr) bool {
 		if !p.rsMoved {
 			p.rsMoved = true
 			win.KillTimer(lv, rsTimer)
+			p.stopHoldBar(lv)
 		}
 		if p.rsStart < 0 {
 			p.rsStart = row
@@ -760,6 +830,10 @@ func (p *Panel) rightSelectMsg(lv win.HWND, msg uint32, wp, lp uintptr) bool {
 		p.endRightSelect(lv)
 		return false
 	case 0x0113: // WM_TIMER
+		if wp == rsBarTimer {
+			p.drawHoldBar(lv)
+			return true
+		}
 		if wp != rsTimer {
 			return false
 		}
@@ -786,6 +860,7 @@ func (p *Panel) endRightSelect(lv win.HWND) {
 	}
 	p.rsActive = false
 	win.KillTimer(lv, rsTimer)
+	p.stopHoldBar(lv)
 	if getCapture() == lv {
 		win.ReleaseCapture()
 	}
@@ -796,4 +871,51 @@ var procGetCapture = user32.NewProc("GetCapture")
 func getCapture() win.HWND {
 	h, _, _ := procGetCapture.Call()
 	return win.HWND(h)
+}
+
+// stageDrag: a húzott archívumbeli / távoli elemek kibontása egy ideiglenes mappába.
+// Kis archívumnál csendben, egyébként folyamatablakkal. Ha közben az egérgombot
+// felengedték, a húzás elmarad (különben a fájlok azonnal oda kerülnének, ahol az
+// egér éppen áll).
+func (p *Panel) stageDrag(ents []*Entry, right bool) (string, []string, bool) {
+	dir, err := tempViewDir()
+	if err != nil {
+		return "", nil, false
+	}
+	var total int64
+	for _, e := range ents {
+		total += e.Size
+		if e.IsDir {
+			total += 64 << 20 // a mappa tartalmát nem ismerjük: inkább folyamatablak
+		}
+	}
+	if _, isArc := p.vfs.(Archive); isArc && total < 32<<20 {
+		q := &quietProgress{}
+		if err := exportItems(p.vfs, ents, dir, q); err != nil || q.err != nil {
+			return "", nil, false
+		}
+	} else {
+		title := T("Kicsomagolás")
+		if isRemoteKind(p.kind()) {
+			title = T("Letöltés")
+		}
+		if runJob(p.app.mw, title, func(j *Job) error { return exportItems(p.vfs, ents, dir, j) }) != nil {
+			return "", nil, false
+		}
+	}
+	btn := int32(win.VK_LBUTTON)
+	if right {
+		btn = win.VK_RBUTTON
+	}
+	if st, _, _ := procGetAsyncKeyState.Call(uintptr(btn)); st&0x8000 == 0 {
+		return "", nil, false
+	}
+	var paths []string
+	for _, e := range ents {
+		lp := filepath.Join(dir, e.Name)
+		if _, err := os.Lstat(lp); err == nil {
+			paths = append(paths, lp)
+		}
+	}
+	return dir, paths, len(paths) > 0
 }

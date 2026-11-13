@@ -27,6 +27,7 @@ import (
 )
 
 type App struct {
+	badge    *dragBadge // húzás közben az egér melletti címke
 	fa       fyne.App
 	fgJobs   atomic.Int32 // futó (előtérbeli) műveletek száma a kilépési kérdéshez
 	win      fyne.Window
@@ -130,7 +131,10 @@ func main() {
 	a.split = container.NewHSplit(a.left.root, a.right.root)
 	a.split.Offset = 0.5
 	a.toolbarHolder = container.NewStack()
-	a.win.SetContent(container.NewBorder(a.toolbarHolder, container.NewVBox(cmdRow, fkeys), nil, nil, a.split))
+	a.badge = newDragBadge()
+	a.win.SetContent(container.NewStack(
+		container.NewBorder(a.toolbarHolder, container.NewVBox(cmdRow, fkeys), nil, nil, a.split),
+		a.badge.layer)) // a húzásjelző réteg legfelül
 	a.loadTypeColors()
 	a.keyMap = map[string]string{}
 	for _, b := range a.userKeys() {

@@ -7,6 +7,7 @@ package main
 
 import (
 	"fmt"
+	"fyne.io/fyne/v2"
 	"os"
 	"os/exec"
 	"os/user"
@@ -249,16 +250,58 @@ func (a *App) openVirtual(p *Panel, e *Entry, view bool) {
 	if isRemoteKind(p.kind()) {
 		title = T("Letöltés")
 	}
-	a.runJob(title, func(j *job) error { return exportItems(p.vfs, []*Entry{e}, dir, j) }, func(err error) {
+	v, vdir, where := p.vfs, p.vpath, p.vfs.Info()
+	a.runJob(title, func(j *job) error { return exportItems(v, []*Entry{e}, dir, j) }, func(err error) {
 		local := filepath.Join(dir, e.Name)
 		if _, serr := os.Stat(local); err != nil || serr != nil {
 			return
 		}
-		if view && !isMediaFile(e.Name) {
-			a.showViewer(local)
+		if view {
+			if isMediaFile(e.Name) {
+				a.openFile(local)
+			} else {
+				a.showViewer(local)
+			}
 			return
 		}
-		a.openFile(local)
+		// szerkesztés: mentéskor a program visszaírja az eredeti helyére
+		s := newEditSession(v, vdir, where, local)
+		s.watch(a.editSaved)
+		a.openInEditor(local)
+	})
+}
+
+// editSaved: a szerkesztő elmentette az archívumból / távoli helyről megnyitott
+// fájlt; a program visszaírja, és jelzi az eredményt. A figyelő szálán fut, és
+// megvárja a visszaírás végét. Távoli helyre a háttérben ír; archívumba a szokásos
+// folyamatablakkal, mert az archívumot közben a panel is olvashatja.
+func (a *App) editSaved(s *editSession) {
+	done := make(chan error, 1)
+	if _, isArc := s.v.(Archive); isArc {
+		fyne.Do(func() {
+			a.runJob(T("Visszaírás"), func(j *job) error { return s.writeBack(j) }, func(err error) {
+				done <- err
+			})
+		})
+	} else {
+		done <- s.writeBackQuiet()
+	}
+	err := <-done
+	dlog("visszaírás: %s → %s %s: %v", s.local, s.where, s.dir, err)
+	fyne.Do(func() {
+		if err != nil {
+			a.warn(fmt.Sprintf(T("A(z) %s nem írható vissza ide: %s\n%s\n\nA módosított példány itt van:\n%s"),
+				s.name(), s.where, errText(err), s.local))
+			return
+		}
+		for _, p := range []*Panel{a.left, a.right} {
+			if p.vfs == s.v {
+				if p.vpath == s.dir {
+					p.refreshVFS()
+				}
+				p.status.SetText(fmt.Sprintf(T("✓ %s visszaírva: %s"), s.name(), s.where))
+			}
+		}
 	})
 }
 

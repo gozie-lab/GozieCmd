@@ -64,6 +64,13 @@
     <control>pointing</control>
   </supports>
   <releases>
+    <release version="0.59" date="2026-11-13">
+      <description>
+        <p>Editing files inside archives and on remote locations writes changes back; drag and
+        drop from and to archives and remote locations; drag label; hold indicator for
+        right-button selection.</p>
+      </description>
+    </release>
     <release version="0.58" date="2026-11-12"/>
     <release version="0.57" date="2026-11-12">
       <description>

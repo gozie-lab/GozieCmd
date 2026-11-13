@@ -51,6 +51,8 @@ type Panel struct {
 
 	// jobb gombos kijelölés
 	rsTimer *time.Timer
+	rsAnim  *fyne.Animation
+	rsProg  float32 // a nyomva tartás jelzősávjának kitöltése (0–1)
 	rsRow   int
 	rsDown  bool // jobb gomb lenyomva (jelölő húzás)
 	rsMark  bool // a húzás ezt az állapotot adja a soroknak
@@ -991,9 +993,11 @@ func (p *Panel) rowMouseDown(idx int, ev *desktop.MouseEvent) {
 			if p.rsTimer != nil {
 				p.rsTimer.Stop()
 			}
+			p.startHoldBar()
 			p.rsTimer = time.AfterFunc(time.Second, func() {
 				fyne.Do(func() {
 					p.rsTimer = nil
+					p.stopHoldBar()
 					p.setMark(p.rsRow, true)
 					p.showContextMenu(pos)
 				})
@@ -1009,6 +1013,7 @@ func (p *Panel) rowMouseDown(idx int, ev *desktop.MouseEvent) {
 func (p *Panel) rowMouseUp(idx int, ev *desktop.MouseEvent) {
 	if ev.Button == desktop.MouseButtonSecondary {
 		p.rsDown = false
+		p.stopHoldBar()
 		if p.rsTimer != nil {
 			p.rsTimer.Stop()
 			p.rsTimer = nil
@@ -1026,6 +1031,7 @@ func (p *Panel) rowHover(idx int, ev *desktop.MouseEvent) {
 		return
 	}
 	if p.rsTimer != nil { // húzás: nem kell helyi menü
+		p.stopHoldBar()
 		p.rsTimer.Stop()
 		p.rsTimer = nil
 	}
@@ -1075,6 +1081,7 @@ func (p *Panel) dragMove(idx int, ev *fyne.DragEvent) {
 	o := p.app.other(p)
 	o.setDropRowAt(ev.AbsolutePosition)
 	p.app.lastDragPos = ev.AbsolutePosition
+	p.updateDragBadge(ev.AbsolutePosition)
 }
 
 func (p *Panel) dragEnd() {
@@ -1082,6 +1089,9 @@ func (p *Panel) dragEnd() {
 		return
 	}
 	p.dragging = false
+	if p.app.badge != nil {
+		p.app.badge.hide()
+	}
 	o := p.app.other(p)
 	row := o.dropRow
 	o.clearDropRow()
@@ -1096,8 +1106,8 @@ func (p *Panel) dragEnd() {
 			p.view.refreshAll()
 		}
 	}
-	target := ""
-	if row >= 0 && row < len(o.items) && o.items[row].IsDir && o.vfs == nil {
+	target := "" // a kiemelt célmappa (archívumon / távoli helyen belül is)
+	if row >= 0 && row < len(o.items) && o.items[row].IsDir {
 		target = o.items[row].Path
 	}
 	move := p.app.fa.Driver().(desktop.Driver).CurrentKeyModifiers()&fyne.KeyModifierShift != 0
@@ -1514,4 +1524,34 @@ func (p *Panel) kind() string {
 		return "local"
 	}
 	return p.vfs.Kind()
+}
+
+// startHoldBar: jobb gombos kijelölésnél a nyomva tartott sor alján egy sáv telik meg
+// a helyi menü megjelenéséig. Egy rövid kattintásnál (kijelölés) nem látszik: a sáv
+// csak 0,2 másodperc után indul.
+func (p *Panel) startHoldBar() {
+	p.stopHoldBar()
+	row := p.rsRow
+	p.rsAnim = fyne.NewAnimation(time.Second, func(f float32) {
+		if f < 0.2 || p.rsRow != row || !p.rsDown {
+			return
+		}
+		p.rsProg = (f - 0.2) / 0.8
+		p.view.refreshItem(row)
+	})
+	p.rsAnim.Curve = fyne.AnimationLinear
+	p.rsAnim.Start()
+}
+
+func (p *Panel) stopHoldBar() {
+	if p.rsAnim != nil {
+		p.rsAnim.Stop()
+		p.rsAnim = nil
+	}
+	if p.rsProg != 0 {
+		p.rsProg = 0
+		if p.rsRow >= 0 && p.rsRow < len(p.items) {
+			p.view.refreshItem(p.rsRow)
+		}
+	}
 }

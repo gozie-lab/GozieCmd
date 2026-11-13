@@ -58,7 +58,30 @@ func (a *App) transferTo(src, dst *Panel, targetDir string, move bool, ask bool)
 		return
 	}
 	if src.vfs != nil || dst.vfs != nil {
-		a.vfsTransfer(src, dst, items, move)
+		if !ask {
+			a.vfsTransfer(src, dst, items, move, targetDir)
+			return
+		}
+		where := targetDir
+		if where == "" {
+			where = dst.path
+			if dst.vfs != nil {
+				where = dst.vpath
+			}
+		}
+		if dst.vfs != nil {
+			where = dst.vfs.Display(where)
+		}
+		verb, title := T("%s másolása ide:"), T("Másolás")
+		if move {
+			verb, title = T("%s mozgatása ide:"), T("Mozgatás")
+		}
+		a.choice(title, fmt.Sprintf(verb, describe(items))+"\n"+where, []string{T("Másolás ide"), T("Mozgatás ide"), T("Mégse")},
+			map[bool]int{false: 0, true: 1}[move], func(i int) {
+				if i < 2 {
+					a.vfsTransfer(src, dst, items, i == 1, targetDir)
+				}
+			})
 		return
 	}
 	if targetDir == "" {

@@ -188,6 +188,7 @@
  "A távoli kapcsolat bontása, vissza a helyi mappába (Ctrl+Shift+F)": "Disconnect the remote connection and return to the local folder (Ctrl+Shift+F)",
  "A többfájl-átnevezés csak helyi mappában működik.": "Multi-rename works only in local folders.",
  "A visszavonás nem sikerült:\n%s": "Undo failed:\n%s",
+ "A(z) %s nem írható vissza ide: %s\n%s\n\nA módosított példány itt van:\n%s": "%s could not be written back to: %s\n%s\n\nThe modified copy is here:\n%s",
  "A(z) %s szerver gépkulcsa MEGVÁLTOZOTT az előző kapcsolódás óta.\n\nEz lehet a szerver újratelepítése, de egy támadás jele is.\nÚj ujjlenyomat: %s\n\nCsak akkor kapcsolódj, ha biztosan tudod, miért változott.": "The host key of the server %s has CHANGED since the last connection.\n\nThis may be a reinstalled server, but also a sign of an attack.\nNew fingerprint: %s\n\nOnly connect if you are sure why it changed.",
  "A(z) %s szerver gépkulcsa MEGVÁLTOZOTT az előző kapcsolódás óta.\n\nEz lehet a szerver újratelepítése, de egy támadás jele is.\nÚj ujjlenyomat: %s\n\nCsak akkor kapcsolódj, ha biztosan tudod, miért változott. Mégis kapcsolódsz?": "The host key of the server %s has CHANGED since the last connection.\n\nThis may be a reinstalled server, but also a sign of an attack.\nNew fingerprint: %s\n\nOnly connect if you are sure why it changed. Connect anyway?",
  "A(z) „%s” archívum jelszóval védett.\nJelszó:": "The archive “%s” is password-protected.\nPassword:",
@@ -654,6 +655,7 @@
  "Mozgatás (F6)": "Move (F6)",
  "Mozgatás / átnevezés": "Move / rename",
  "Mozgatás ide": "Move here",
+ "Mozgatás ide:": "Move to:",
  "Mozgatás…": "Moving…",
  "Már létezik": "Already exists",
  "Már létezik ilyen nevű elem:\n%s": "An item with this name already exists:\n%s",
@@ -668,6 +670,7 @@
  "Másolás   F5": "Copy   F5",
  "Másolás (F5)": "Copy (F5)",
  "Másolás ide": "Copy here",
+ "Másolás ide:": "Copy to:",
  "Másolás…": "Copying…",
  "Mégis kapcsolódom": "Connect anyway",
  "Mégse": "Cancel",
@@ -856,6 +859,7 @@
  "Vissza   Alt+←": "Back   Alt+←",
  "Visszavonva.": "Undone.",
  "Visszavonás": "Undo",
+ "Visszaírás": "Writing back",
  "Vágólapra": "To clipboard",
  "Váratlan programhiba miatt a program leáll:\n%v\n\nA részletek a naplóban: %s": "The program stops because of an unexpected error:\n%v\n\nDetails in the log: %s",
  "Végleges törlés": "Delete permanently",
@@ -915,6 +919,7 @@
  "csatolva, de nem találom a helyét": "mounted, but I cannot find where",
  "ebből a nézetből nem lehet másolni": "cannot copy from this view",
  "ehhez a formátumhoz (%s) a 7-Zip program szükséges. Telepítsd a 7-zip.org oldalról, vagy add meg a helyét a Beállításokban.": "this format (%s) requires 7-Zip. Install it from 7-zip.org, or set its location in Settings.",
+ "ejtsd a másik panelre": "drop on the other panel",
  "ez a megosztások listája: itt nem lehet fájlművelet": "this is the list of shares: no file operations here",
  "ez az archívumformátum csak olvasható": "this archive format is read-only",
  "ez nem darabolt fájl (.001, .002 …)": "this is not a split file (.001, .002 …)",
@@ -1052,5 +1057,6 @@
  "▲ Előző eltérés": "▲ Previous difference",
  "▼ Következő eltérés": "▼ Next difference",
  "▼ Következő eltérés (F7)": "▼ Next difference (F7)",
- "⚠ %d háttérművelet hibával zárult": "⚠ %d background operation failed|⚠ %d background operations failed"
+ "⚠ %d háttérművelet hibával zárult": "⚠ %d background operation failed|⚠ %d background operations failed",
+ "✓ %s visszaírva: %s": "✓ %s written back: %s"
 }

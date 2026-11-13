@@ -53,8 +53,82 @@ func (a *App) openVirtual(p *Panel, e *Entry, view bool) {
 	shellOpen(a.mw.Handle(), local, dir)
 }
 
+// editVirtual: archívumbeli / távoli fájl szerkesztése. A fájl ideiglenes helyre
+// kerül, a szerkesztőben nyílik meg, és minden mentés után a program visszaírja.
+func (a *App) editVirtual(p *Panel, e *Entry) {
+	dir, err := tempViewDir()
+	if err != nil {
+		walk.MsgBox(a.mw, appName, errText(err), walk.MsgBoxIconWarning)
+		return
+	}
+	title := T("Kicsomagolás")
+	if isRemoteKind(p.kind()) {
+		title = T("Letöltés")
+	}
+	v, vdir := p.vfs, p.vpath
+	err = runJob(a.mw, title, func(j *Job) error { return exportItems(v, []*Entry{e}, dir, j) })
+	local := filepath.Join(dir, e.Name)
+	if _, serr := os.Stat(local); err != nil || serr != nil {
+		if err != nil {
+			walk.MsgBox(a.mw, appName, fmt.Sprintf(T("A fájl nem nyitható meg:\n%s"), errText(err)), walk.MsgBoxIconWarning)
+		}
+		return
+	}
+	s := newEditSession(v, vdir, v.Info(), local)
+	s.watch(a.editSaved)
+	if err := a.openInEditor(local, dir); err != nil {
+		walk.MsgBox(a.mw, appName, err.Error(), walk.MsgBoxIconWarning)
+	}
+}
+
+// editSaved: a szerkesztő elmentette a fájlt; visszaírás, majd jelzés. A figyelő
+// szálán fut, és megvárja a végét. Távoli helyre a háttérben ír; archívumba a
+// folyamatablakkal, mert az archívumot közben a panel is olvashatja.
+func (a *App) editSaved(s *editSession) {
+	var err error
+	if _, isArc := s.v.(Archive); isArc {
+		done := make(chan struct{})
+		a.mw.Synchronize(func() {
+			defer close(done)
+			err = runJob(a.mw, T("Visszaírás"), func(j *Job) error { return s.writeBack(j) })
+		})
+		<-done
+	} else {
+		err = s.writeBackQuiet()
+	}
+	dlog("visszaírás: %s → %s %s: %v", s.local, s.where, s.dir, err)
+	a.mw.Synchronize(func() {
+		if err != nil {
+			walk.MsgBox(a.mw, appName, fmt.Sprintf(T("A(z) %s nem írható vissza ide: %s\n%s\n\nA módosított példány itt van:\n%s"),
+				s.name(), s.where, errText(err), s.local), walk.MsgBoxIconWarning)
+			return
+		}
+		for _, p := range []*Panel{a.left, a.right} {
+			if p.vfs == s.v {
+				if p.vpath == s.dir {
+					p.refreshVFS()
+				}
+				p.status.SetText(fmt.Sprintf(T("✓ %s visszaírva: %s"), s.name(), s.where))
+			}
+		}
+	})
+}
+
 func (a *App) vfsTransfer(src, dst *Panel, items []*Entry, move bool) {
+	a.vfsTransferTo(src, dst, items, move, "", true)
+}
+
+// vfsTransferTo: mint a vfsTransfer, de megadható célmappa (húzásnál a kiemelt
+// mappa; üres: a célpanel mappája), és kihagyható a kérdés (ha már megerősítették).
+func (a *App) vfsTransferTo(src, dst *Panel, items []*Entry, move bool, target string, ask bool) {
 	sk, dk := src.kind(), dst.kind()
+	dstDir := dst.path
+	if dst.vfs != nil {
+		dstDir = dst.vpath
+	}
+	if target != "" {
+		dstDir = target
+	}
 	if sk == "net" || dk == "net" {
 		walk.MsgBox(a.mw, appName, T("A hálózati listában előbb nyiss meg egy megosztást (Enter), azon belül már ugyanúgy másolhatsz, mint egy helyi mappában."), walk.MsgBoxIconInformation)
 		return
@@ -67,11 +141,11 @@ func (a *App) vfsTransfer(src, dst *Panel, items []*Entry, move bool) {
 	if move {
 		verb = T("%s mozgatása ide:")
 	}
-	where := dst.path
+	where := dstDir
 	if dst.vfs != nil {
-		where = dst.vfs.Display(dst.vpath)
+		where = dst.vfs.Display(dstDir)
 	}
-	if walk.MsgBox(a.mw, appName, fmt.Sprintf(verb, describe(items))+"\n"+where,
+	if ask && walk.MsgBox(a.mw, appName, fmt.Sprintf(verb, describe(items))+"\n"+where,
 		walk.MsgBoxYesNo|walk.MsgBoxIconQuestion) != win.IDYES {
 		return
 	}
@@ -83,10 +157,10 @@ func (a *App) vfsTransfer(src, dst *Panel, items []*Entry, move bool) {
 	if isRemoteKind(sk) {
 		title = T("Letöltés")
 	}
-	exportDir := dst.path
+	exportDir := dstDir
 	stage := ""
 	if dk == "local" {
-		if stage = a.stagingFor(dst.path); stage != "" {
+		if stage = a.stagingFor(dstDir); stage != "" {
 			defer os.RemoveAll(stage)
 			exportDir = stage
 		}
@@ -116,7 +190,7 @@ func (a *App) vfsTransfer(src, dst *Panel, items []*Entry, move bool) {
 			j.mu.Lock()
 			j.done = 0
 			j.mu.Unlock()
-			if err := importPaths(dst.vfs, paths, dst.vpath, j); err != nil {
+			if err := importPaths(dst.vfs, paths, dstDir, j); err != nil {
 				return err
 			}
 		}
@@ -127,7 +201,7 @@ func (a *App) vfsTransfer(src, dst *Panel, items []*Entry, move bool) {
 	})
 	if err == nil && stage != "" {
 		// védett célmappa: előbb a helyére kerüljön, csak utána töröljük a forrást
-		if a.moveStaged(stage, dst.path) && move {
+		if a.moveStaged(stage, dstDir) && move {
 			err = runJob(a.mw, T("Törlés"), func(j *Job) error { return deleteItems(src.vfs, items, j) })
 		}
 	}

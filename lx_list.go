@@ -56,6 +56,7 @@ type fileRow struct {
 	p     *Panel
 	idx   int
 	bg    *canvas.Rectangle
+	prog  *canvas.Rectangle // jobb gombos nyomva tartás: a helyi menüig hátralévő idő
 	icon  *canvas.Image
 	cells [numCols]*canvas.Text
 	full  [numCols]string
@@ -64,7 +65,8 @@ type fileRow struct {
 }
 
 func newFileRow(p *Panel) *fileRow {
-	r := &fileRow{p: p, idx: -1, bg: canvas.NewRectangle(color.Transparent)}
+	r := &fileRow{p: p, idx: -1, bg: canvas.NewRectangle(color.Transparent), prog: canvas.NewRectangle(color.Transparent)}
+	r.prog.Hide()
 	r.icon = canvas.NewImageFromResource(theme.FileIcon())
 	r.icon.FillMode = canvas.ImageFillContain
 	for i := range r.cells {
@@ -83,6 +85,7 @@ func (r *fileRow) CreateRenderer() fyne.WidgetRenderer {
 	for _, c := range r.cells {
 		objs = append(objs, c)
 	}
+	objs = append(objs, r.prog)
 	return &rowRenderer{r: r, objs: objs}
 }
 
@@ -108,6 +111,7 @@ func (rr *rowRenderer) Layout(s fyne.Size) {
 	r := rr.r
 	r.bg.Resize(s)
 	r.bg.Move(fyne.NewPos(0, 0))
+	r.layoutHold(s)
 	switch r.p.viewMode {
 	case viewBrief:
 		rr.layoutBrief(s)
@@ -145,6 +149,21 @@ func (rr *rowRenderer) Layout(s fyne.Size) {
 }
 
 // fitText a szöveget „…”-tal rövidíti, hogy elférjen.
+// layoutHold: a jobb gomb nyomva tartásakor a sor alján egy sáv telik meg, amíg a
+// helyi menü elő nem jön – így látszik, hogy a várakozásnak célja van.
+func (r *fileRow) layoutHold(s fyne.Size) {
+	f := r.p.rsProg
+	if r.idx != r.p.rsRow || f <= 0 {
+		r.prog.Hide()
+		return
+	}
+	h := float32(3)
+	r.prog.FillColor = r.p.app.look.CursorFg // a nyomva tartott sor a kurzorsor: a betűszínével látszik rajta
+	r.prog.Resize(fyne.NewSize(s.Width*f, h))
+	r.prog.Move(fyne.NewPos(0, s.Height-h))
+	r.prog.Show()
+}
+
 func fitText(s string, w, size float32, st fyne.TextStyle) string {
 	if s == "" || fyne.MeasureText(s, size, st).Width <= w {
 		return s
@@ -194,12 +213,39 @@ func (r *fileRow) TappedSecondary(ev *fyne.PointEvent) {
 func (r *fileRow) Dragged(ev *fyne.DragEvent) { r.p.dragMove(r.idx, ev) }
 func (r *fileRow) DragEnd()                   { r.p.dragEnd() }
 
+// ── a lista üres része ──
+
+// fileList és fileGrid: a Fyne lista és rács, kiegészítve azzal, hogy a sorok alatti
+// üres részre kattintva (bal vagy jobb gombbal) a panel aktív lesz. A sorok a saját
+// kattintásukat maguk kezelik, ide csak az üres terület kattintása jut el.
+type fileList struct {
+	widget.List
+	p *Panel
+}
+
+func (l *fileList) Tapped(*fyne.PointEvent)          { l.p.activateFromEmpty() }
+func (l *fileList) TappedSecondary(*fyne.PointEvent) { l.p.activateFromEmpty() }
+
+type fileGrid struct {
+	widget.GridWrap
+	p *Panel
+}
+
+func (g *fileGrid) Tapped(*fyne.PointEvent)          { g.p.activateFromEmpty() }
+func (g *fileGrid) TappedSecondary(*fyne.PointEvent) { g.p.activateFromEmpty() }
+
+func (p *Panel) activateFromEmpty() {
+	p.activate()
+	p.focus()
+}
+
 // ── a lista nézete: fókusz és billentyűzet ──
 
 type fileView struct {
 	widget.BaseWidget
 	p       *Panel
 	bg      *canvas.Rectangle
+	flist   *fileList
 	list    *widget.List
 	grid    *widget.GridWrap
 	holder  *fyne.Container
@@ -208,12 +254,13 @@ type fileView struct {
 
 func newFileView(p *Panel) *fileView {
 	v := &fileView{p: p, bg: canvas.NewRectangle(color.White)}
-	v.list = widget.NewList(
-		func() int { return len(p.items) },
-		func() fyne.CanvasObject { return newFileRow(p) },
-		func(id widget.ListItemID, o fyne.CanvasObject) { p.updateRow(id, o.(*fileRow)) },
-	)
-	v.list.HideSeparators = true
+	l := &fileList{p: p}
+	l.Length = func() int { return len(p.items) }
+	l.CreateItem = func() fyne.CanvasObject { return newFileRow(p) }
+	l.UpdateItem = func(id widget.ListItemID, o fyne.CanvasObject) { p.updateRow(id, o.(*fileRow)) }
+	l.HideSeparators = true
+	l.ExtendBaseWidget(l)
+	v.list, v.flist = &l.List, l
 	v.holder = container.NewStack()
 	v.ExtendBaseWidget(v)
 	return v
@@ -230,17 +277,21 @@ func (v *fileView) applyMode() {
 	p := v.p
 	if p.viewMode == viewDetail {
 		v.grid = nil
-		v.holder.Objects = []fyne.CanvasObject{container.NewThemeOverride(v.list, tightTheme{p.app.theme})}
+		v.holder.Objects = []fyne.CanvasObject{container.NewThemeOverride(v.listObj(), tightTheme{p.app.theme})}
 	} else {
-		v.grid = widget.NewGridWrap(
-			func() int { return len(p.items) },
-			func() fyne.CanvasObject { return newFileRow(p) },
-			func(id widget.GridWrapItemID, o fyne.CanvasObject) { p.updateRow(id, o.(*fileRow)) },
-		)
-		v.holder.Objects = []fyne.CanvasObject{container.NewThemeOverride(v.grid, tightTheme{p.app.theme})}
+		g := &fileGrid{p: p}
+		g.Length = func() int { return len(p.items) }
+		g.CreateItem = func() fyne.CanvasObject { return newFileRow(p) }
+		g.UpdateItem = func(id widget.GridWrapItemID, o fyne.CanvasObject) { p.updateRow(id, o.(*fileRow)) }
+		g.ExtendBaseWidget(g)
+		v.grid = &g.GridWrap
+		v.holder.Objects = []fyne.CanvasObject{container.NewThemeOverride(g, tightTheme{p.app.theme})}
 	}
 	v.holder.Refresh()
 }
+
+// listObj: a részletes nézet listája a saját (kattintható) típusával.
+func (v *fileView) listObj() fyne.CanvasObject { return v.flist }
 
 func (v *fileView) refreshAll() {
 	if v.grid != nil {

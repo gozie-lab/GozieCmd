@@ -68,6 +68,8 @@ type Panel struct {
 	// jobb gombos kijelölés állapota
 	rsActive, rsMark, rsMoved bool
 	rsStart, rsLast           int
+	rsT0                      time.Time // a jobb gomb lenyomásának ideje (a jelzősávhoz)
+	rsBar                     win.RECT  // a kirajzolt jelzősáv (törléshez)
 
 	fwd      []string
 	lv       win.HWND // a lista tényleges Windows-vezérlője (húzd és ejtsd)

@@ -20,14 +20,23 @@ import (
 )
 
 // vfsTransfer: archívum / FTP és helyi mappa (vagy két virtuális hely) között.
-func (a *App) vfsTransfer(src, dst *Panel, items []*Entry, move bool) {
+// vfsTransfer: másolás / mozgatás, ha valamelyik oldal archívum vagy távoli hely.
+// target: a célmappa (húzásnál a kiemelt mappa); üres: a célpanel mappája.
+func (a *App) vfsTransfer(src, dst *Panel, items []*Entry, move bool, target ...string) {
+	dstDir := dst.path
+	if dst.vfs != nil {
+		dstDir = dst.vpath
+	}
+	if len(target) > 0 && target[0] != "" {
+		dstDir = target[0]
+	}
 	title := T("Másolás")
 	if move {
 		title = T("Mozgatás")
 	}
 	if dst.vfs == nil && src.vfs != nil { // kicsomagolás / letöltés
 		a.runJob(title, func(j *job) error {
-			if err := exportItems(src.vfs, items, dst.path, j); err != nil {
+			if err := exportItems(src.vfs, items, dstDir, j); err != nil {
 				return err
 			}
 			if move && canDelete(src.vfs) && j.Clean() {
@@ -46,7 +55,7 @@ func (a *App) vfsTransfer(src, dst *Panel, items []*Entry, move bool) {
 	if src.vfs == nil && dst.vfs != nil { // tömörítés / feltöltés
 		paths := entryPaths(items)
 		a.runJob(title, func(j *job) error {
-			if err := importPaths(dst.vfs, paths, dst.vpath, j); err != nil {
+			if err := importPaths(dst.vfs, paths, dstDir, j); err != nil {
 				return err
 			}
 			if move && j.Clean() { // hiba vagy kihagyás esetén a forrás megmarad
@@ -76,7 +85,7 @@ func (a *App) vfsTransfer(src, dst *Panel, items []*Entry, move bool) {
 		for _, e := range items {
 			paths = append(paths, filepath.Join(tmp, e.Name))
 		}
-		if err := importPaths(dst.vfs, paths, dst.vpath, j); err != nil {
+		if err := importPaths(dst.vfs, paths, dstDir, j); err != nil {
 			return err
 		}
 		if move && canDelete(src.vfs) && j.Clean() {
