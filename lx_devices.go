@@ -11,6 +11,7 @@ import (
 	"crypto/sha1"
 	"errors"
 	"fmt"
+	"fyne.io/fyne/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -145,4 +146,72 @@ func mountDevice(dev string) (string, error) {
 func readFileStr(p string) string {
 	b, _ := os.ReadFile(p)
 	return string(b)
+}
+
+// removableMountFor: ha a mappa egy cserélhető eszközön van (a rendszer a
+// /run/media vagy a /media alá csatolta), az eszköz és a csatolási pont.
+func removableMountFor(dir string) (dev, mnt string, ok bool) {
+	return removableMountIn(readFileStr("/proc/self/mounts"), dir)
+}
+
+func removableMountIn(mounts, dir string) (dev, mnt string, ok bool) {
+	for _, l := range strings.Split(mounts, "\n") {
+		f := strings.Fields(l)
+		if len(f) < 2 || !strings.HasPrefix(f[0], "/dev/") {
+			continue
+		}
+		m := unescapeMount(f[1])
+		if !strings.HasPrefix(m, "/run/media/") && !strings.HasPrefix(m, "/media/") {
+			continue
+		}
+		if (dir == m || strings.HasPrefix(dir, m+"/")) && len(m) > len(mnt) {
+			dev, mnt, ok = f[0], m, true
+		}
+	}
+	return
+}
+
+// ejectDevice: a mappát tartalmazó cserélhető eszköz leválasztása. A paneleket előbb
+// kiviszi az eszközről (különben „foglalt” lenne), majd a rendszerrel (udisks)
+// leválasztja, és ha lehet, ki is kapcsolja, hogy biztonságosan kihúzható legyen.
+func (a *App) ejectDevice(dir string) {
+	dev, mnt, ok := removableMountFor(dir)
+	if !ok {
+		return
+	}
+	away := filepath.Dir(mnt)
+	for _, p := range []*Panel{a.left, a.right} {
+		if p.vfs == nil && (p.path == mnt || strings.HasPrefix(p.path, mnt+"/")) {
+			p.navigate(away, filepath.Base(mnt), true)
+		}
+	}
+	name := filepath.Base(mnt)
+	go func() {
+		out, err := hostify(exec.Command("udisksctl", "unmount", "-b", dev)).CombinedOutput()
+		dlog("leválasztás: %s (%s): %v %s", dev, mnt, err, strings.TrimSpace(string(out)))
+		msg := ""
+		if err != nil {
+			txt := strings.TrimSpace(string(out))
+			switch {
+			case strings.Contains(strings.ToLower(txt), "busy"):
+				msg = fmt.Sprintf(T("A(z) %s nem választható le, mert egy program még használja (például egy megnyitott fájl vagy egy terminál ebben a mappában)."), name)
+			case txt == "":
+				msg = errText(err)
+			default:
+				msg = txt
+			}
+			fyne.Do(func() { a.warn(fmt.Sprintf(T("Leválasztás: %s"), name) + "\n\n" + msg) })
+			return
+		}
+		// a teljes eszköz kikapcsolása (USB-kulcsnál: biztonságos eltávolítás); ha nem
+		// sikerül, attól még le van választva
+		poff := hostify(exec.Command("udisksctl", "power-off", "-b", dev)).Run()
+		dlog("kikapcsolás: %s: %v", dev, poff)
+		fyne.Do(func() {
+			a.refreshDrives()
+			for _, p := range []*Panel{a.left, a.right} {
+				p.status.SetText(fmt.Sprintf(T("✓ %s leválasztva, az eszköz biztonságosan eltávolítható"), name))
+			}
+		})
+	}()
 }

@@ -64,6 +64,13 @@
     <control>pointing</control>
   </supports>
   <releases>
+    <release version="0.61" date="2026-11-14">
+      <description>
+        <p>Unified toolbar on Windows and Linux; eject button for removable drives; the cursor
+        returns to its previous item when going back; correct colours from the first moment
+        with the automatic theme.</p>
+      </description>
+    </release>
     <release version="0.59" date="2026-11-13">
       <description>
         <p>Editing files inside archives and on remote locations writes changes back; drag and

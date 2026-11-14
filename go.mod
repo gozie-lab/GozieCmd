@@ -18,7 +18,6 @@ require (
 	github.com/fyne-io/gl-js v0.2.0 // indirect
 	github.com/fyne-io/glfw-js v0.3.0 // indirect
 	github.com/fyne-io/image v0.1.1 // indirect
-	github.com/fyne-io/oksvg v0.2.0 // indirect
 	github.com/geoffgarside/ber v1.1.0 // indirect
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71 // indirect
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20240506104042-037f3cc74f2a // indirect
@@ -41,7 +40,6 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
-	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.12.1 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
@@ -54,10 +52,12 @@ replace gopkg.in/Knetic/govaluate.v3 => github.com/Knetic/govaluate v3.0.0+incom
 
 require (
 	github.com/bodgit/sevenzip v1.5.2
+	github.com/fyne-io/oksvg v0.2.0
 	github.com/hirochachacha/go-smb2 v1.1.0
 	github.com/jlaffaye/ftp v0.2.4
 	github.com/nwaples/rardecode/v2 v2.4.5
 	github.com/pkg/sftp v1.13.7
+	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef
 	github.com/studio-b12/gowebdav v0.10.0
 	github.com/ulikunitz/xz v0.5.17
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9

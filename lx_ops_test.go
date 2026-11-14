@@ -92,3 +92,23 @@ func TestAppIcon(t *testing.T) {
 		t.Error("megadott képfájl")
 	}
 }
+
+func TestRemovableMount(t *testing.T) {
+	m := "/dev/nvme0n1p2 / btrfs rw 0 0\n" +
+		"/dev/sdb1 /run/media/gozie/PEN\\040DRIVE vfat rw 0 0\n" +
+		"/dev/sdc1 /media/usb ext4 rw 0 0\n" +
+		"tmpfs /run/media/gozie/x tmpfs rw 0 0\n"
+	for _, c := range []struct{ dir, dev, mnt string }{
+		{"/run/media/gozie/PEN DRIVE/Fotók", "/dev/sdb1", "/run/media/gozie/PEN DRIVE"},
+		{"/run/media/gozie/PEN DRIVE", "/dev/sdb1", "/run/media/gozie/PEN DRIVE"},
+		{"/media/usb/a", "/dev/sdc1", "/media/usb"},
+		{"/home/gozie", "", ""},
+		{"/run/media/gozie/x", "", ""},
+		{"/run/media/gozie/PEN DRIVEX", "", ""},
+	} {
+		dev, mnt, ok := removableMountIn(m, c.dir)
+		if dev != c.dev || mnt != c.mnt || ok != (c.dev != "") {
+			t.Errorf("%s: %q %q %v", c.dir, dev, mnt, ok)
+		}
+	}
+}

@@ -3,6 +3,8 @@
 package app
 
 import (
+	"time"
+
 	"net/url"
 	"os"
 	"os/exec"
@@ -147,4 +149,26 @@ func (a *fyneApp) registerRepositories() {
 func (s *settings) applyVariant(variant fyne.ThemeVariant) {
 	s.variant = variant
 	s.apply()
+}
+
+// DetectSystemVariant (Gozie-kiegészítés): induláskor, az ablak felépítése előtt
+// lekérdezi a rendszer világos/sötét beállítását (legfeljebb timeout ideig várva), hogy
+// az első kép már a helyes színekkel jelenjen meg. Alapból a Fyne ezt csak a Run után,
+// a háttérben teszi, addig sötétnek veszi a rendszert, és pár pillanat múlva vált.
+func DetectSystemVariant(timeout time.Duration) {
+	ch := make(chan fyne.ThemeVariant, 1)
+	go func() { ch <- findFreedesktopColorScheme() }()
+	select {
+	case v := <-ch:
+		if v == systemTheme {
+			return
+		}
+		internalapp.CurrentVariant.Store(uint64(v))
+		if a := fyne.CurrentApp(); a != nil {
+			if s, ok := a.Settings().(*settings); ok {
+				s.variant = v
+			}
+		}
+	case <-time.After(timeout):
+	}
 }

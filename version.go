@@ -6,7 +6,7 @@ import "strings"
 
 const appName = "Gozie Commander"
 const appDir = "GozieCommander" // mappanév (beállítások, ideiglenes fájlok)
-const appVersion = "0.59"
+const appVersion = "0.61"
 
 // aboutText: a Névjegy ablak szövege.
 // contactEmail: hibabejelentés, észrevétel. Darabokból áll össze, hogy a forráskódban

@@ -115,17 +115,14 @@ type tbButton struct {
 }
 
 func defaultButtons() []tbButton {
-	ids := []string{"back", "forward", "up", "refresh", "-", "view", "edit", "copy", "move", "mkdir", "delete", "-",
-		"search", "multirename", "compare", "-", "pack", "unpack", "-", "ftp", "network", "-", "terminal", "-", "settings"}
 	var out []tbButton
-	for _, id := range ids {
+	for _, id := range tbDefaultIDs(true) {
 		if id == "-" {
 			out = append(out, tbButton{Sep: true})
 		} else {
 			out = append(out, tbButton{Cmd: id})
 		}
 	}
-	out = append(out[:len(out)-2], tbButton{Exe: "notepad.exe", Tip: T("Jegyzettömb")}, out[len(out)-2], out[len(out)-1])
 	return out
 }
 
@@ -138,7 +135,28 @@ func (a *App) loadButtons() []tbButton {
 	if json.Unmarshal([]byte(v), &b) != nil {
 		return defaultButtons()
 	}
+	if tbIsOldDefault(buttonSig(b), true) {
+		return defaultButtons() // a régi alapsor: az új, egységes alapsor váltja
+	}
 	return b
+}
+
+// buttonSig: a gombsor rövid leírása az alapsorral való összevetéshez.
+func buttonSig(b []tbButton) []string {
+	var out []string
+	for _, x := range b {
+		switch {
+		case x.Sep:
+			out = append(out, "-")
+		case x.Cmd != "":
+			out = append(out, x.Cmd)
+		case x.Params == "" && x.Dir == "" && x.Icon == "":
+			out = append(out, "exe:"+x.Exe)
+		default:
+			out = append(out, "exe:*")
+		}
+	}
+	return out
 }
 
 func (a *App) saveButtons(b []tbButton) {
@@ -229,37 +247,31 @@ func glyphIcon(glyph string, tile walk.Color, size int) *walk.Icon {
 	return ic
 }
 
+// tileIcon: színes lapka a közös (svg) ikonnal, pontosan a képernyő felbontásához
+// rajzolva (nincs utólagos átméretezés, ezért minden DPI-n éles).
+func tileIcon(name, cmd string, size, dpi int) *walk.Icon {
+	if dpi < 96 {
+		dpi = 96
+	}
+	r, g, b := tbTile(cmd)
+	img := tileImage(name, color.NRGBA{r, g, b, 255}, size*dpi/96)
+	ic, err := walk.NewIconFromImageForDPI(img, dpi)
+	if err != nil {
+		return nil
+	}
+	return ic
+}
+
 // cmdColor a parancs lapkájának színe (csoportonként).
 func cmdColor(id string) walk.Color {
-	switch id {
-	case "back", "forward", "up", "root", "refresh":
-		return walk.RGB(0, 103, 192)
-	case "view", "edit":
-		return walk.RGB(0, 133, 120)
-	case "copy", "move":
-		return walk.RGB(16, 124, 16)
-	case "mkdir":
-		return walk.RGB(196, 120, 0)
-	case "delete":
-		return walk.RGB(196, 43, 28)
-	case "rename", "multirename":
-		return walk.RGB(124, 77, 175)
-	case "search", "compare", "sync", "diff", "dupes":
-		return walk.RGB(70, 84, 170)
-	case "pack", "unpack":
-		return walk.RGB(168, 92, 30)
-	case "ftp", "network":
-		return walk.RGB(0, 120, 150)
-	case "terminal":
-		return walk.RGB(60, 60, 60)
-	}
-	return walk.RGB(100, 108, 118)
+	r, g, b := tbTile(id)
+	return walk.RGB(r, g, b)
 }
 
 var iconCacheTB = map[string]*walk.Icon{}
 
-func (b tbButton) icon(size int) *walk.Icon {
-	key := b.Cmd + "|" + b.Exe + "|" + b.Icon + "|" + strconv.Itoa(b.IconIdx) + "|" + strconv.Itoa(size)
+func (b tbButton) icon(size, dpi int) *walk.Icon {
+	key := b.Cmd + "|" + b.Exe + "|" + b.Icon + "|" + strconv.Itoa(b.IconIdx) + "|" + strconv.Itoa(size) + "|" + strconv.Itoa(dpi)
 	if ic, ok := iconCacheTB[key]; ok {
 		return ic
 	}
@@ -268,7 +280,9 @@ func (b tbButton) icon(size int) *walk.Icon {
 		ic, _ = walk.NewIconExtractedFromFileWithSize(expandEnv(b.Icon), b.IconIdx, size)
 	}
 	if ic == nil && b.Cmd != "" {
-		if c, ok := findCommand(b.Cmd); ok {
+		if name, ok := tbIconFile[b.Cmd]; ok {
+			ic = tileIcon(name, b.Cmd, size, dpi) // ugyanaz az ikon, mint Linuxon
+		} else if c, ok := findCommand(b.Cmd); ok {
 			ic = glyphIcon(c.glyph, cmdColor(c.id), size)
 		}
 	}
@@ -336,7 +350,7 @@ func (a *App) buildToolbar() {
 		act := walk.NewAction()
 		act.SetText(b.tooltip())
 		act.SetToolTip(b.tooltip())
-		if ic := b.icon(size); ic != nil {
+		if ic := b.icon(size, dpi); ic != nil {
 			act.SetImage(ic)
 		}
 		act.Triggered().Attach(func() { a.runButton(b) })

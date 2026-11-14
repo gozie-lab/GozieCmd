@@ -32,29 +32,8 @@ type command struct {
 }
 
 func tileColor(id string) color.NRGBA {
-	switch id {
-	case "back", "forward", "up", "root", "refresh":
-		return rgb(0, 103, 192)
-	case "view", "edit":
-		return rgb(0, 133, 120)
-	case "copy", "move":
-		return rgb(16, 124, 16)
-	case "mkdir":
-		return rgb(196, 120, 0)
-	case "delete":
-		return rgb(196, 43, 28)
-	case "rename", "multirename":
-		return rgb(124, 77, 175)
-	case "search", "compare", "sync":
-		return rgb(70, 84, 170)
-	case "pack", "unpack":
-		return rgb(168, 92, 30)
-	case "ftp", "network":
-		return rgb(0, 120, 150)
-	case "terminal":
-		return rgb(60, 60, 60)
-	}
-	return rgb(100, 108, 118)
+	r, g, b := tbTile(id)
+	return rgb(r, g, b)
 }
 
 func commands() []command {
@@ -144,10 +123,8 @@ type tbButton struct {
 }
 
 func defaultButtons() []tbButton {
-	ids := []string{"back", "forward", "up", "refresh", "-", "view", "edit", "copy", "move", "mkdir", "delete", "-",
-		"search", "multirename", "compare", "sync", "-", "pack", "unpack", "-", "ftp", "-", "terminal", "-", "settings"}
 	var out []tbButton
-	for _, id := range ids {
+	for _, id := range tbDefaultIDs(false) {
 		if id == "-" {
 			out = append(out, tbButton{Sep: true})
 		} else {
@@ -166,7 +143,28 @@ func (a *App) loadButtons() []tbButton {
 	if json.Unmarshal([]byte(v), &b) != nil {
 		return defaultButtons()
 	}
+	if tbIsOldDefault(buttonSig(b), false) {
+		return defaultButtons() // a régi alapsor: az új, egységes alapsor váltja
+	}
 	return b
+}
+
+// buttonSig: a gombsor rövid leírása az alapsorral való összevetéshez.
+func buttonSig(b []tbButton) []string {
+	var out []string
+	for _, x := range b {
+		switch {
+		case x.Sep:
+			out = append(out, "-")
+		case x.Cmd != "":
+			out = append(out, x.Cmd)
+		case x.Params == "" && x.Dir == "" && x.Icon == "":
+			out = append(out, "exe:"+x.Exe)
+		default:
+			out = append(out, "exe:*")
+		}
+	}
+	return out
 }
 
 func (a *App) saveButtons(b []tbButton) {

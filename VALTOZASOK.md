@@ -3,6 +3,29 @@
 A kiadások leírása innen készül: a GitHub Actions a verzióhoz tartozó szakaszt
 teszi a kiadás oldalára. Új kiadás előtt ide kerül egy új `## X.YY` szakasz.
 
+## 0.61
+
+- Egységes eszköztár: Windowson és Linuxon ugyanazok az alapgombok és ugyanazok az
+  ikonok. Windowson az ikonok a képernyő felbontásához rajzolódnak, ezért minden
+  nagyításnál élesek. Aki az eszköztárat nem szabta testre, automatikusan az új
+  alapsort kapja; a testre szabott eszköztár változatlan marad (az eszköztár
+  szerkesztőjében az *Alapállapot* gomb állítja vissza).
+  *Unified toolbar: the same default buttons and icons on Windows and Linux; on Windows
+  the icons are drawn for the screen resolution and stay sharp at any scaling.*
+- Linux: cserélhető eszközön (pendrive, kártya) a panel fejlécében *Leválasztás* gomb
+  jelenik meg. A program kilép az eszközről, leválasztja, és ha lehet, ki is kapcsolja,
+  hogy biztonságosan kihúzható legyen.
+  *Linux: an Eject button on removable drives unmounts and powers off the device.*
+- Mappába lépve a kurzor a lista elején áll; visszalépéskor (Alt+Balra, Alt+Jobbra,
+  szülőmappa) arra az elemre áll, ahol a mappában legutóbb volt.
+  *Entering a folder puts the cursor at the top; going back or forward returns it to
+  the item it was on.*
+- Linux: automatikus témánál a program az első pillanattól a rendszer szerinti
+  (világos vagy sötét) színekkel indul; eddig sötét listákkal jelent meg, és egy-két
+  másodperc múlva váltott.
+  *Linux: with the automatic theme the program starts in the system's light or dark
+  colours right away instead of switching after a moment.*
+
 ## 0.59
 
 - Archívumban vagy távoli helyen (FTP, SFTP, WebDAV, SMB) lévő fájl szerkesztése (F4):

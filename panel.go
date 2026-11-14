@@ -22,6 +22,7 @@ import (
 )
 
 type Panel struct {
+	lastPos map[string]string // mappánként a kurzor alatti elem, amikor elhagytuk (visszalépéskor oda áll)
 	app  *App
 	side string
 
@@ -298,6 +299,10 @@ func (p *Panel) navigate(path, selectName string, addHistory, quiet bool) bool {
 		p.model.dirSizes = map[string]int64{}
 	}
 	if p.path != "" && !strings.EqualFold(p.path, path) {
+		p.rememberPos()
+		if selectName == "" {
+			selectName = p.lastPos[strings.ToLower(path)] // ahol legutóbb álltunk benne
+		}
 		if addHistory {
 			p.back = append(p.back, p.path)
 			p.fwd = nil
@@ -1135,5 +1140,18 @@ func (p *Panel) updateSortTitles() {
 		if cols.At(i).Title() != t {
 			cols.At(i).SetTitle(t)
 		}
+	}
+}
+
+// rememberPos: a mappa elhagyásakor megjegyzi, melyik elemen állt a kurzor.
+func (p *Panel) rememberPos() {
+	if p.path == "" || p.vfs != nil {
+		return
+	}
+	if e := p.currentEntry(); e != nil && !e.IsParent {
+		if p.lastPos == nil {
+			p.lastPos = map[string]string{}
+		}
+		p.lastPos[strings.ToLower(p.path)] = e.Name
 	}
 }

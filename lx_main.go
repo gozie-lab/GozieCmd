@@ -85,6 +85,10 @@ func main() {
 	}
 
 	a.fa = app.NewWithID("hu.gozie.commander")
+	// a rendszer világos/sötét beállítása már az első kép előtt (automatikus témához)
+	t0 := time.Now()
+	app.DetectSystemVariant(700 * time.Millisecond)
+	dlog("rendszertéma lekérdezése: %v, sötét: %v", time.Since(t0).Round(time.Millisecond), a.fa.Settings().ThemeVariant() == theme.VariantDark)
 	a.theme = &gzTheme{a: a}
 	a.fa.Settings().SetTheme(a.theme)
 	a.fa.SetIcon(appIconRes)

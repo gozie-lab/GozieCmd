@@ -26,6 +26,7 @@ import (
 )
 
 type Panel struct {
+	lastPos map[string]string // mappánként a kurzor alatti elem, amikor elhagytuk (visszalépéskor oda áll)
 	app  *App
 	side string
 
@@ -67,6 +68,7 @@ type Panel struct {
 	// nézet, gyorsnézet
 	viewMode int
 	btnDisc  *widget.Button // távoli kapcsolat bontása
+	btnEject *widget.Button // cserélhető eszköz leválasztása
 	colHead  *fyne.Container
 	qvBox    *fyne.Container
 
@@ -120,7 +122,12 @@ func (p *Panel) build() {
 		p.focus()
 	})
 	p.btnDisc.Hide()
-	top := container.NewBorder(nil, nil, p.drives, container.NewHBox(p.btnDisc, btnRoot, btnUp), p.free)
+	p.btnEject = widget.NewButtonWithIcon(T("Leválasztás"), theme.UploadIcon(), func() {
+		p.app.setActive(p)
+		p.app.ejectDevice(p.path)
+	})
+	p.btnEject.Hide()
+	top := container.NewBorder(nil, nil, p.drives, container.NewHBox(p.btnDisc, p.btnEject, btnRoot, btnUp), p.free)
 
 	p.headBg = canvas.NewRectangle(color.Gray{200})
 	p.pathText = canvas.NewText("", color.Black)
@@ -303,6 +310,13 @@ func (p *Panel) navigate(path, selectName string, addHistory bool) bool {
 		p.fwd = nil
 	}
 	changed := p.path != abs
+	if changed {
+		p.rememberPos()
+		if selectName == "" {
+			selectName = p.lastPos[abs] // ahol legutóbb álltunk benne (vagy az első elem)
+		}
+		p.cursor = -1 // új mappa: a régi sor helye nem számít
+	}
 	p.path = abs
 	p.dirStamp = st.ModTime()
 	p.syncWatch()
@@ -807,6 +821,13 @@ func (p *Panel) updateHeader() {
 			p.btnDisc.Show()
 		} else {
 			p.btnDisc.Hide()
+		}
+	}
+	if p.btnEject != nil {
+		if _, _, ok := removableMountFor(p.path); ok && p.vfs == nil {
+			p.btnEject.Show()
+		} else {
+			p.btnEject.Hide()
 		}
 	}
 	if p.vfs != nil {
@@ -1553,5 +1574,18 @@ func (p *Panel) stopHoldBar() {
 		if p.rsRow >= 0 && p.rsRow < len(p.items) {
 			p.view.refreshItem(p.rsRow)
 		}
+	}
+}
+
+// rememberPos: a mappa elhagyásakor megjegyzi, melyik elemen állt a kurzor.
+func (p *Panel) rememberPos() {
+	if p.path == "" || p.vfs != nil {
+		return
+	}
+	if e := p.currentEntry(); e != nil && !e.IsParent {
+		if p.lastPos == nil {
+			p.lastPos = map[string]string{}
+		}
+		p.lastPos[p.path] = e.Name
 	}
 }
